@@ -1,10 +1,3 @@
-from .lexer import clean_assembly
-from .mapper import demangle_stream
+from .parsing import process_assembly
 
-def process_assembly(raw_asm: str) -> str:
-    """
-    Pipeline: Raw Garbage -> Cleaned -> Demangled -> Human Readable
-    """
-    cleaned = clean_assembly(raw_asm)
-    demangled = demangle_stream(cleaned)
-    return demangled
+__all__ = ["process_assembly"]

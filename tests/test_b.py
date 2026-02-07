@@ -1,10 +1,10 @@
 import sys
 import os
 
-# Add project root to python path so we can import src
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Add src to python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
-from src.parsing import process_assembly
+from localbolt.parsing import process_assembly
 
 RAW_GARBAGE = """
     .file "test.cpp"
