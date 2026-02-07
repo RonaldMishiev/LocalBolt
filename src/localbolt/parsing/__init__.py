@@ -1,6 +1,7 @@
 from .lexer import clean_assembly_with_mapping
 from .mapper import demangle_stream
-from typing import Dict, Tuple
+from .perf_parser import parse_mca_output, InstructionStats
+from typing import Dict, Tuple, List, Optional
 
 def process_assembly(raw_asm: str) -> Tuple[str, Dict[int, int]]:
     """

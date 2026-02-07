@@ -4,7 +4,7 @@ import os
 # Add src to python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
-from localbolt.parsing import process_assembly
+from localbolt.parsing import process_assembly, parse_mca_output
 
 RAW_GARBAGE = """
     .file "test.cpp"
@@ -22,6 +22,14 @@ _Z3foov:
     .loc 1 12 0
     ret
     .cfi_endproc
+"""
+
+MOCK_MCA_OUTPUT = """
+Instruction Info:
+[0]: {1, 0.50, 0.50, 0.00,  - }     pushq	%rbp
+[1]: {3, 1.00, 1.00, 0.00,  - }     imul	eax, edi
+[2]: {1, 0.50, 0.50, 0.00,  - }     popq	%rbp
+[3]: {1, 1.00, 1.00, 0.00,  - }     retq
 """
 
 def test_pipeline():
@@ -42,20 +50,25 @@ def test_pipeline():
     assert "foo()" in result
     assert "pushq" in result
     
-    # Assertions for mapping
-    # Expected output lines (approximate indices):
-    # 0: foo():
-    # 1:     pushq %rbp
-    # 2:     movq %rsp, %rbp
-    # 3:     popq %rbp
-    # 4:     ret
-    
     # Note: pushq is line 1, and should map to source line 10
     assert mapping[1] == 10
     assert mapping[2] == 11
     assert mapping[4] == 12
     
-    print("\nTest Passed!")
+    print("\nAssembly Pipeline Test Passed!")
+
+def test_perf_parsing():
+    print("\n--- TESTING PERF PARSING ---")
+    stats = parse_mca_output(MOCK_MCA_OUTPUT)
+    
+    for idx, data in stats.items():
+        print(f"Instr {idx}: Latency={data.latency}, Throughput={data.throughput}")
+    
+    assert stats[0].latency == 1
+    assert stats[1].latency == 3
+    assert stats[1].throughput == 1.0
+    print("Perf Parsing Test Passed!")
 
 if __name__ == "__main__":
     test_pipeline()
+    test_perf_parsing()
