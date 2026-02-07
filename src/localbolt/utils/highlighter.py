@@ -1,6 +1,5 @@
 import re
 import shutil
-
 from rich.text import Text
 
 REGISTERS = re.compile(
@@ -27,11 +26,12 @@ INSTRUCTIONS = re.compile(
     r"|cmp|test|and|or|xor|not|shl|shr|sar|sal"
     r"|jmp|je|jne|jz|jnz|jg|jge|jl|jle|ja|jae|jb|jbe"
     r"|call|ret|push|pop|nop|int|syscall|leave|enter"
-    r"|cmov\w+"
+    r"|cmov\w+|stp|ldp|stur|ldur|adrp|bl"
     r")\b",
     re.IGNORECASE,
 )
 
+<<<<<<< HEAD
 
 def highlight_asm(cleaned_asm: list[str]) -> Text:
     """
@@ -89,16 +89,19 @@ def highlight_asm(cleaned_asm: list[str]) -> Text:
 
 
 def severity_styles(cycles: int | None) -> tuple[str, str]:
+=======
+def _severity_styles(cycles: int | None) -> tuple[str, str]:
+>>>>>>> 11c028b (updated highlighter)
     """Return (foreground_style, background_color) for a given cycle count."""
     if cycles is None:
         return ("", "")
     if cycles <= 1:
-        return ("#005500", "on #103010")
+        return ("#ffffff", "on #004400") # White on Green
     if cycles <= 4:
-        return ("#806600", "on #302510")
-    return ("#882222", "on #301010")
+        return ("#ffffff", "on #664400") # White on Amber
+    return ("#ffffff", "on #880000")    # White on Red
 
-
+<<<<<<< HEAD
 def highlight_asm_line(line: str, bg: str) -> Text:
     """
     Syntax-highlight a single assembly line and apply a background tint.
@@ -110,41 +113,39 @@ def highlight_asm_line(line: str, bg: str) -> Text:
     stripped = line.lstrip()
 
     # Comments: entire line bright_black
+=======
+def _highlight_asm_line(line: str, bg: str) -> Text:
+    segment = Text()
+    stripped = line.lstrip()
+
+>>>>>>> 11c028b (updated highlighter)
     if stripped.startswith("#") or stripped.startswith(";"):
         segment.append(line, style=f"bright_black {bg}".strip())
         return segment
 
-    # Walk through the line applying token-level highlighting
-    # Build a style map: for each character position, track the best style
     token_styles: list[str | None] = [None] * len(line)
 
-    # Labels (e.g. "main:" or ".L1:")
     label_match = re.match(r"^(\s*\.?\w+\s*:)", line)
     if label_match:
         for j in range(label_match.start(), label_match.end()):
             token_styles[j] = "bold yellow"
 
-    # Instructions
     for m in INSTRUCTIONS.finditer(line):
         for j in range(m.start(), m.end()):
             token_styles[j] = "blue"
 
-    # Size keywords
     for m in SIZE_KEYWORDS.finditer(line):
         for j in range(m.start(), m.end()):
             token_styles[j] = "magenta"
 
-    # Numeric literals
     for m in NUMBERS.finditer(line):
         for j in range(m.start(), m.end()):
             token_styles[j] = "cyan"
     
-    # Registers (highest priority among tokens)
     for m in REGISTERS.finditer(line):
         for j in range(m.start(), m.end()):
             token_styles[j] = "bold red"
 
-    # Emit characters, grouping consecutive runs of the same style
     i = 0
     while i < len(line):
         cur_style = token_styles[i]
@@ -157,62 +158,36 @@ def highlight_asm_line(line: str, bg: str) -> Text:
 
     return segment
 
-
-def build_gutter(asm_lines: list[str], cycle_counts: dict[int, int]) -> Text:
+def build_gutter(asm_lines: list[str], cycle_counts: dict[int, int], width: int = 120) -> Text:
     """
-    Build a Rich Text object with syntax-highlighted assembly on the left,
-    cycle counts right-aligned to the terminal edge, and a severity-tinted
-    background spanning each full line.
-
-    Background tints by severity:
-        * 1 cycle  -> subtle green  (#002200)
-        * 2-4      -> subtle amber  (#332200)
-        * 5+       -> subtle red    (#330000)
-        * no data  -> no background
-
-    Args:
-        asm_lines: The cleaned asm split by lines (from Member B).
-        cycle_counts: { asm_line_number: latency } (from Member A's AnalysisResult).
-
-    Returns:
-        A Rich Text object with highlighted asm + right-aligned gutter per line.
+    Builds highlighted ASM with fixed-width lines to prevent wrapping and show heat map.
     """
-    term_width = shutil.get_terminal_size().columns
     gutter_width = 6
-    result = Text()
+    result = Text(no_wrap=True) # Instruct Rich not to wrap
 
     for i, line in enumerate(asm_lines):
         line_num = i + 1
         cycles = cycle_counts.get(line_num)
         fg_style, bg = severity_styles(cycles)
 
+<<<<<<< HEAD
         # Syntax-highlighted asm text with severity background
         result.append_text(highlight_asm_line(line, bg))
+=======
+        line_text = _highlight_asm_line(line, bg)
+        result.append_text(line_text)
+>>>>>>> 11c028b (updated highlighter)
 
-        # Padding between asm and gutter (same background)
-        padding_needed = max(1, term_width - len(line) - gutter_width)
+        # Pad each line to the fixed width so the background color spans the full width
+        padding_needed = max(1, width - len(line) - gutter_width)
         result.append(" " * padding_needed, style=bg.strip() or None)
 
-        # Cycle count on the right
         if cycles is not None:
-            result.append(f"{cycles:>{gutter_width}}", style=f"{fg_style} {bg}".strip())
+            result.append(f"{cycles:>{gutter_width}}c", style=f"{fg_style} {bg}".strip())
         else:
-            result.append(" " * gutter_width)
+            result.append(" " * (gutter_width + 1))
 
         if line_num < len(asm_lines):
             result.append("\n")
 
     return result
-
-
-if __name__ == "__main__":
-    from pathlib import Path
-    from rich.console import Console
-
-    test_file = Path(__file__).parent / "test_assembly.txt"
-    lines = test_file.read_text().splitlines()
-
-    console = Console()
-    fake_cycles = {1: 1, 2: 1, 3: 3, 4: 1, 5: 1, 6: 2, 7: 6, 8: 1, 9: 1}
-    combined = build_gutter(lines, fake_cycles)
-    console.print(combined)
