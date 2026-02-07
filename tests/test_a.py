@@ -1,4 +1,10 @@
-from localbolt.compiler.driver import CompilerDriver
+import sys
+import os
+
+# Add src to python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+
+from localbolt.compiler import CompilerDriver
 
 def test_driver():
     # create a dummy c++ file
@@ -11,10 +17,13 @@ def test_driver():
     asm, err = driver.compile("temp_test.cpp")
     
     if err:
-        print("ERRORS:", err)
-    else:
+        print("COMPILER LOG (Warnings/Errors):", err)
+    
+    if asm:
         print("SUCCESS! Assembly sample:")
         print("\n".join(asm.splitlines()[:10])) # Print first 10 lines
+    else:
+        print("FAILURE: No assembly generated.")
         
     print("\n--- Performance Analysis ---")
     perf = driver.analyze_perf(asm)

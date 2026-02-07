@@ -3,7 +3,7 @@ import tempfile
 import shutil
 from pathlib import Path
 from typing import Tuple, List
-from .analylzer import find_compile_commands, get_flags_from_db
+from .analyzer import find_compile_commands, get_flags_from_db
 
 class CompilerDriver:
     def __init__(self, compiler: str = "g++"):
