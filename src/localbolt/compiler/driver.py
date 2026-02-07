@@ -3,82 +3,121 @@ import tempfile
 import shutil
 import platform
 from pathlib import Path
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 from .analyzer import find_compile_commands, get_flags_from_db
+from ..utils.config import ConfigManager
 
 class CompilerDriver:
-    def __init__(self, compiler: str = "g++"):
-        # Check if compiler exists
-        if not shutil.which(compiler):
-            raise RuntimeError(f"Compiler '{compiler}' not found in PATH.")
+    def __init__(self, config_manager: Optional[ConfigManager] = None):
+        # Use provided config or load default
+        self.config = config_manager if config_manager else ConfigManager()
+        
+        # Initialize compiler from config
+        target_compiler = self.config.get("compiler", "g++")
+        self.set_compiler(target_compiler)
+
+    def set_compiler(self, compiler: str):
+        """
+        Updates the compiler used by the driver.
+        """
+        path = shutil.which(compiler)
+        if not path:
+            # Fallback for common aliases if specifically requested "g++" fails on Mac
+            if compiler == "g++" and shutil.which("clang++"):
+                path = shutil.which("clang++")
+            else:
+                # We don't raise here anymore to allow the app to start even if config is stale.
+                # The user will get an error when they try to compile.
+                print(f"Warning: Compiler '{compiler}' not found.")
+                path = None
+        
         self.compiler = compiler
+        self.compiler_path = path
+
+    @staticmethod
+    def discover_compilers() -> List[str]:
+        """
+        Returns a list of supported compilers found on the system.
+        """
+        candidates = ["g++", "clang++", "gcc", "clang"]
+        found = [c for c in candidates if shutil.which(c)]
+        return found
 
     def compile(self, source_file: str, user_flags: List[str] = []) -> Tuple[str, str]:
         """
         Compiles the source file to assembly.
         Returns: (Assembly String, Error String)
         """
+        if not self.compiler_path:
+             return "", f"Compiler '{self.compiler}' not configured or not found."
+
         src_path = Path(source_file)
         
-        # 1. Detect Flags from compile_commands.json
-        db_path = find_compile_commands(src_path.parent)
-        auto_flags = []
-        if db_path:
-            auto_flags = get_flags_from_db(source_file, db_path)
-            
-        # 2. Construct the Command
+        # --- 1. System Flags (MANDATORY) ---
         # -S: Generate assembly
         # -g: Generate debug info (for mapping)
         # -fverbose-asm: Add helpful comments
-        # -O3: Default to high optimization (can be overridden)
         command = [
             self.compiler,
             "-S", 
             "-g",
-            "-fverbose-asm",
-            "-O3" 
+            "-fverbose-asm"
         ]
 
+        # --- 2. Architecture Flags (SYSTEM ADAPTER) ---
         # Portability: Only use Intel syntax on x86 machines
         arch = platform.machine().lower()
         if any(x in arch for x in ["x86", "amd64", "i386"]):
             command.append("-masm=intel")
-        
-        # Add discovered flags + user flags
-        # Note: User flags come last to override defaults
+
+        # --- 3. Config Flags (USER PREFERENCE) ---
+        # Optimization Level (default to -O3 if missing)
+        opt_level = self.config.get("opt_level", "-O3")
+        if opt_level:
+            command.append(opt_level)
+            
+        # Extra Config Flags
+        extra_conf_flags = self.config.get("flags", [])
+        if extra_conf_flags:
+            command.extend(extra_conf_flags)
+
+        # --- 4. Auto-Discovery (PROJECT CONTEXT) ---
+        db_path = find_compile_commands(src_path.parent)
+        auto_flags = []
+        if db_path:
+            auto_flags = get_flags_from_db(source_file, db_path)
         command.extend(auto_flags)
+        
+        # --- 5. Runtime Overrides (HIGHEST PRIORITY) ---
         command.extend(user_flags)
         
-        # Input file
+        # Input/Output
         command.append(str(src_path))
         
-        # Output to a temporary file (so we don't clutter the user's directory)
+        # Output to a temporary file
         with tempfile.NamedTemporaryFile(suffix=".s", mode="w+", delete=False) as tmp:
             output_file = tmp.name
             
         command.extend(["-o", output_file])
 
-        # 3. Run the Compiler
+        # Run the Compiler
         try:
             result = subprocess.run(
                 command,
                 capture_output=True,
                 text=True,
-                check=False # Don't throw exception on compilation error
+                check=False
             )
             
             if result.returncode != 0:
-                # Compilation Failed
                 return "", result.stderr
             
-            # Compilation Succeeded -> Read the temp file
             with open(output_file, 'r') as f:
                 asm_content = f.read()
                 
-            return asm_content, result.stderr # Warnings might still be in stderr
+            return asm_content, result.stderr
 
         finally:
-            # Cleanup temp file
             if Path(output_file).exists():
                 Path(output_file).unlink()
 

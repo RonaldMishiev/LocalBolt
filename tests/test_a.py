@@ -11,7 +11,10 @@ def test_driver():
     with open("temp_test.cpp", "w") as f:
         f.write("int add(int a, int b) { return a + b; }")
         
-    driver = CompilerDriver("g++")
+    # New API: Uses ConfigManager internally or takes one
+    # To test specific compiler, we can update the config or rely on default
+    driver = CompilerDriver() 
+    driver.set_compiler("g++") # Explicitly set for test
     
     print("--- Compiling ---")
     asm, err = driver.compile("temp_test.cpp")
