@@ -1,0 +1,44 @@
+To start the virtual environment: 
+
+python3 -m venv .venv 
+
+Gather all dependencies 
+
+source .venv/bin/activate
+
+pip install -e .
+
+
+Unit Tests
+  These test individual components in isolation without requiring external
+  tools like g++ or llvm-mca.
+
+
+    # Run all unit tests
+   for f in tests/unit/test_*.py; do python3 "$f"; done
+   
+   # Individual unit tests
+   python3 tests/unit/test_compiler.py
+   python3 tests/unit/test_config.py
+   python3 tests/unit/test_lexer_stl.py
+   python3 tests/unit/test_parser.py
+
+
+  Integration Tests
+  These test the end-to-end workflow, often involving the filesystem, the
+  real compiler, or system tools.
+
+
+    # Run all integration tests
+    for f in tests/integration/test_*.py; do python3 "$f"; done
+   
+    # Individual integration tests
+    python3 tests/integration/test_engine.py
+    python3 tests/integration/test_lexer.py
+    python3 tests/integration/test_watcher.py
+
+
+
+Samad's local commands for safekeeping: 
+cd /home/samad/Desktop/tartanhacks/tartanhacks
+

@@ -1,158 +1,111 @@
-"""
-Member C — Main Textual Application
-====================================
-Assembly-only viewer with live recompilation on file save.
-
-Integrates with main branch architecture:
-  - BoltEngine (engine.py) handles compile → parse → analyze pipeline
-  - LocalBoltState holds all application data
-  - FileWatcher (utils/watcher.py) detects file saves
-  - highlight_asm / build_gutter (utils/highlighter.py) for rendering
-
-The user edits their C++ file in their own IDE; saves are detected
-and the assembly view updates automatically.
-"""
-
-from __future__ import annotations
-
-from pathlib import Path
-
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer
+from textual.widgets import Header, Footer, Static, TextArea, DataTable
+from textual.containers import Horizontal, Vertical
+from textual.binding import Binding
 from textual.message import Message
-
-from localbolt.ui.widgets import AssemblyView, StatusBar
-
+from ..engine import BoltEngine
+from ..utils.state import LocalBoltState
 
 class LocalBoltApp(App):
-    """LocalBolt — a local Compiler Explorer in your terminal."""
+    """LocalBolt: Focused Assembly Explorer."""
 
-    CSS_PATH = "styles.tcss"
-    TITLE = "LocalBolt"
+    CSS = """
+    Screen {
+        background: #1e1e1e;
+    }
+    #asm-container {
+        width: 70%;
+        border-right: heavy $primary;
+    }
+    #perf-container {
+        width: 30%;
+    }
+    .panel-title {
+        background: $primary;
+        color: white;
+        text-align: center;
+        width: 100%;
+        padding: 0 1;
+    }
+    TextArea {
+        border: none;
+    }
+    DataTable {
+        height: 100%;
+    }
+    """
 
-    from textual.binding import Binding
     BINDINGS = [
         Binding("q", "quit", "Quit", show=True),
         Binding("r", "refresh", "Recompile", show=True),
     ]
 
     class StateUpdated(Message):
-        """Posted by the engine callback when a recompile finishes."""
-        def __init__(self, state) -> None:
+        def __init__(self, state: LocalBoltState) -> None:
             super().__init__()
             self.state = state
 
-    def __init__(self, source_file: str) -> None:
+    def __init__(self, source_file: str):
         super().__init__()
-        self.source_file: str = str(Path(source_file).resolve())
-        self.engine = None  # Will be set in on_mount if engine is available
-
-    # -- compose the widget tree ----------------------------------
+        self.engine = BoltEngine(source_file)
+        self.engine.on_update_callback = lambda state: self.post_message(self.StateUpdated(state))
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield AssemblyView()
-        yield StatusBar()
+        yield Horizontal(
+            Vertical(
+                Static(" ASSEMBLY OUTPUT ", classes="panel-title"),
+                TextArea(id="asm-view", language="asm", read_only=True),
+                id="asm-container"
+            ),
+            Vertical(
+                Static(" PERFORMANCE (llvm-mca) ", classes="panel-title"),
+                DataTable(id="perf-table"),
+                id="perf-container"
+            )
+        )
         yield Footer()
 
-    # -- lifecycle ------------------------------------------------
-
     def on_mount(self) -> None:
-        self.status_bar.set_status(
-            file=Path(self.source_file).name,
-            status="starting",
-        )
-        # Try to import and start the engine (main branch's BoltEngine)
-        try:
-            from localbolt.engine import BoltEngine
-            self.engine = BoltEngine(self.source_file)
-            self.engine.on_update_callback = (
-                lambda state: self.post_message(self.StateUpdated(state))
-            )
-            self.engine.start()
-            self.status_bar.set_status(status="watching")
-            self.notify(f"Monitoring {self.source_file}")
-        except Exception as exc:
-            self._show_error(f"Engine init error: {exc}")
-
-    def on_unmount(self) -> None:
-        if self.engine is not None:
-            try:
-                self.engine.stop()
-            except Exception:
-                pass
-
-    # -- convenience accessors ------------------------------------
-
-    @property
-    def assembly_view(self) -> AssemblyView:
-        return self.query_one("#assembly-view", AssemblyView)
-
-    @property
-    def status_bar(self) -> StatusBar:
-        return self.query_one("#status-bar", StatusBar)
-
-    # -- handle engine state updates ------------------------------
+        table = self.query_one("#perf-table", DataTable)
+        table.add_columns("Line", "Instr", "Cycles")
+        table.cursor_type = "row"
+        
+        self.engine.start()
+        self.notify(f"Monitoring {self.engine.state.source_path}")
 
     def on_local_bolt_app_state_updated(self, message: StateUpdated) -> None:
-        """Called when BoltEngine finishes a compile/parse cycle."""
         state = message.state
-
-        # Render the assembly
-        try:
-            from localbolt.utils.highlighter import highlight_asm, build_gutter
-            from localbolt.parsing.perf_parser import InstructionStats
-
-            asm_lines = state.asm_content.splitlines() if state.asm_content else []
-
-            if asm_lines:
-                # build_gutter returns a combined Rich Text with highlighting + cycles
-                cycle_counts = {}
-                for idx, stats in state.perf_stats.items():
-                    cycle_counts[idx] = stats.latency
-                rendered = build_gutter(asm_lines, cycle_counts)
-                self.assembly_view.set_asm(rendered)
-            else:
-                from rich.text import Text
-                self.assembly_view.set_asm(Text(state.asm_content or "(no assembly)"))
-
-        except Exception:
-            # Fallback: just show raw asm text
-            from rich.text import Text
-            self.assembly_view.set_asm(
-                Text(state.asm_content or "(no assembly)")
+        asm_view = self.query_one("#asm-view", TextArea)
+        perf_table = self.query_one("#perf-table", DataTable)
+        
+        # 1. Update Assembly
+        asm_view.text = state.asm_content
+        
+        # 2. Update Perf Table
+        perf_table.clear()
+        # llvm-mca indices might not align perfectly with cleaned ASM indices
+        # For now, we show the raw instruction stats we parsed
+        for idx, stats in state.perf_stats.items():
+            perf_table.add_row(
+                str(idx),
+                "instr", # We could extract the mnemonic here if needed
+                f"{stats.latency}c"
             )
-
-        # Update status bar
-        if state.compiler_output and "error" in state.compiler_output.lower():
-            self.status_bar.set_status(status="error", errors=1)
-            self.notify("Compilation error", severity="error")
-        elif state.compiler_output and "warning" in state.compiler_output.lower():
-            self.status_bar.set_status(status="ready", errors=0)
+        
+        if state.compiler_output and "warning" in state.compiler_output.lower():
             self.notify("Recompiled with warnings", severity="warning")
+        elif state.compiler_output:
+             self.notify("Compilation error", severity="error")
         else:
-            self.status_bar.set_status(status="ready", errors=0)
             self.notify("Updated")
 
-    # -- actions --------------------------------------------------
-
     def action_refresh(self) -> None:
-        """Keybinding 'r' -> manual recompile."""
-        if self.engine is not None:
-            self.status_bar.set_status(status="compiling…")
-            self.engine.refresh()
-        else:
-            self._show_error("Engine not initialized")
+        self.engine.refresh()
 
-    # -- helpers ---------------------------------------------------
-
-    def _show_error(self, text: str) -> None:
-        self.status_bar.set_status(status="error", errors=1)
-        from rich.text import Text
-        self.assembly_view.set_asm(Text(text, style="bold red"))
-
+    def on_unmount(self) -> None:
+        self.engine.stop()
 
 def run_tui(source_file: str):
-    """Entry point called by main.py — matches main branch interface."""
     app = LocalBoltApp(source_file)
     app.run()

@@ -11,9 +11,9 @@ def demangle_stream(asm_content: str) -> str:
         return asm_content + "\n# [WARN] c++filt not found, symbols mangled."
 
     try:
-        # Run c++filt as a subprocess
+        # Run c++filt as a subprocess with -n to handle mangled names correctly on macOS
         process = subprocess.Popen(
-            ["c++filt"],
+            ["c++filt", "-n"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
