@@ -38,7 +38,7 @@ class FileWatcher:
         """
         path = Path(file_path).resolve()
         if not path.exists():
-            raise FileNotFoundError(f"Cannot watch non-existent file: {file_path}")
+            raise FileNotFoundError(f"Cannot watch non-existent file: {path}")
 
         handler = AssemblyUpdateHandler(str(path), callback)
         # Watch the parent directory

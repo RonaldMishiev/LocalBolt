@@ -4,53 +4,61 @@ import shlex
 from pathlib import Path
 from typing import List, Optional
 
-def find_compile_commands(root_dir: str = ".") -> Optional[Path]:
+def find_compile_commands(start_path: Path) -> Optional[Path]:
     """
-    Searches for compile_commands.json in standard build locations.
+    Recursively searches upwards for compile_commands.json.
     """
-    # Common places where CMake puts this file
-    search_paths = [
-        Path(root_dir) / "compile_commands.json",
-        Path(root_dir) / "build" / "compile_commands.json",
-        Path(root_dir) / "out" / "compile_commands.json",
-        Path(root_dir) / "debug" / "compile_commands.json",
-    ]
-    
-    for path in search_paths:
-        if path.exists():
-            return path
+    current = start_path.resolve()
+    # Check current and parents up to root
+    for parent in [current] + list(current.parents):
+        # Check common build subdirectories
+        search_locs = [
+            parent / "compile_commands.json",
+            parent / "build" / "compile_commands.json",
+            parent / "out" / "compile_commands.json",
+            parent / "debug" / "compile_commands.json",
+        ]
+        for loc in search_locs:
+            if loc.exists():
+                return loc
     return None
 
 def get_flags_from_db(source_file: str, db_path: Path) -> List[str]:
     """
-    Parses the JSON database to find flags for a specific file.
+    Extracts flags and converts relative include paths to absolute.
     """
     try:
         with open(db_path, 'r') as f:
             commands = json.load(f)
             
-        # Normalize paths for comparison
         abs_source = str(Path(source_file).resolve())
         
         for entry in commands:
-            # Entry usually looks like: {"directory": "...", "command": "g++ -I... -c file.cpp", "file": "..."}
-            entry_file = str(Path(entry.get('directory', '.'), entry['file']).resolve())
+            entry_dir = Path(entry.get('directory', '.'))
+            entry_file = str(Path(entry_dir, entry['file']).resolve())
             
             if entry_file == abs_source:
-                # We found the file! Now extract flags.
-                # The 'command' string includes the compiler (g++) and the file itself.
-                # We need to strip those and keep only the -I, -D, -std flags.
                 args = shlex.split(entry['command'])
-                
-                # Filter useful flags (Include paths, Defines, Standards)
-                # Skip the compiler binary (index 0) and the input file
                 useful_flags = []
+                
                 for arg in args[1:]:
-                    if arg.startswith(("-I", "-D", "-std", "-f", "-m")):
+                    # Handle Include Paths
+                    if arg.startswith("-I"):
+                        inc_path = arg[2:]
+                        # If relative, make it absolute based on the JSON's directory
+                        if not os.path.isabs(inc_path):
+                            abs_inc = str((entry_dir / inc_path).resolve())
+                            useful_flags.append(f"-I{abs_inc}")
+                        else:
+                            useful_flags.append(arg)
+                    
+                    # Keep other important flags
+                    elif arg.startswith(("-D", "-std", "-f", "-m")):
                         useful_flags.append(arg)
+                        
                 return useful_flags
                 
     except Exception as e:
         print(f"Error parsing compile commands: {e}")
         
-    return [] # Fallback: No flags found
+    return []

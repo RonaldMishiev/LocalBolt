@@ -9,3 +9,5 @@ build/
 .vscode/
 compile_commands.json
 output.s
+
+test_project/
