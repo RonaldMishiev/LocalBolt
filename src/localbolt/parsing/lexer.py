@@ -1,81 +1,103 @@
 import re
 import os
-from typing import List, Dict, Tuple, Set
+from typing import List, Dict, Tuple, Set, Optional
 
-# Regex patterns for lines we want to DELETE from the final view
-NOISE_PATTERNS = [
-    r"^\s*\.cfi_",        
-    r"^\s*\.LFB\d+",
-    r"^\s*\.LFE\d+",
-    r"^\s*\.text",
-    r"^\s*\.p2align",
-    r"^\s*\.type",
-    r"^\s*\.size",
-    r"^\s*\.globl",
-    r"^\s*\.section",
-    r"^\s*endbr64"
-]
+# --- REGEX REGISTRY ---
+RE_NOISE_LABEL = re.compile(r"^\s*_*[Ll](\d+|BB|func|tmp|return|set|addr|exception|ttbase|cst|ttbaseref|debug|names|info|line|cu|common|str_off|abbrev)[a-zA-Z0-9_$]*:")
+RE_SYSTEM_SYMBOL = re.compile(r"_*Z[NK]*St|GCC_except|___cxa|___gxx|_*clang_call")
+RE_SKIP_SECTION = re.compile(r"^\s*\.section\s+.*(__DWARF|__LD|__debug|__apple|__ctf|__llvm)", re.IGNORECASE)
+RE_CODE_SECTION = re.compile(r"^\s*\.(section\s+.*(__TEXT|text)|text)", re.IGNORECASE)
+RE_DIRECTIVE = re.compile(r"^\s*\.[a-zA-Z0-9_]+")
+RE_DATA_DIRECTIVE = re.compile(r"^\s*\.(asciz|string)")
+RE_FILE = re.compile(r"^\s*\.file\s+(\d+)\s+\"([^\"]+)\"")
+RE_LOC = re.compile(r"^\s*\.loc\s+(\d+)\s+(\d+)")
 
-FILE_PATTERN = r"^\s*\.file\s+(\d+)\s+\"([^\"]+)\""
-LOC_PATTERN = r"^\s*\.loc\s+(\d+)\s+(\d+)"
+class LexerContext:
+    def __init__(self, source_filename: Optional[str]):
+        self.main_file_id = 1
+        self.source_basename = os.path.basename(source_filename) if source_filename else None
+        self.current_source_line = None
+        self.active_file_id = None
+        self.hide_dwarf = True
+        self.hide_stl = True
+        self.hide_noise = True
 
 def clean_assembly_with_mapping(raw_asm: str, source_filename: str = None) -> Tuple[str, Dict[int, int]]:
-    """
-    Filters out noise and assembly from included headers.
-    Returns:
-        (cleaned_asm_string, {asm_line_idx: source_line_idx})
-    """
-    clean_lines = []
-    line_map = {}
-    
-    # Map of index -> filename from .file directives
-    file_table = {}
-    # Indices that belong to our "main" source file
-    main_file_indices = set()
-    
-    current_file_idx = None
-    current_source_line = None
-    
-    # Normalize source filename for comparison
-    source_basename = os.path.basename(source_filename) if source_filename else None
-
+    ctx = LexerContext(source_filename)
     lines = raw_asm.splitlines()
     
-    # First pass: Identify which file index corresponds to the user's source file
+    # Identify Main File
     for line in lines:
-        file_match = re.match(FILE_PATTERN, line)
-        if file_match:
-            idx, path = int(file_match.group(1)), file_match.group(2)
-            file_table[idx] = path
-            # If no source_filename provided, assume the first .file is the main one
-            if not source_basename or os.path.basename(path) == source_basename:
-                main_file_indices.add(idx)
+        match = RE_FILE.match(line)
+        if match:
+            fid, path = int(match.group(1)), match.group(2)
+            if ctx.source_basename and os.path.basename(path) == ctx.source_basename:
+                ctx.main_file_id = fid
+                break
 
-    # Second pass: Filter and map
+    clean_lines = []
+    line_map = {}
+    in_valid_section = True
+    in_user_block = True 
+    pending_label = None
+
     for line in lines:
-        # Update current file/line context via .loc
-        loc_match = re.match(LOC_PATTERN, line)
+        line_content = line.split(';')[0].rstrip()
+        stripped = line_content.strip()
+        if not stripped: continue
+
+        # Section Filtering
+        if stripped.startswith(".section") or stripped in (".text", ".data", ".cstring"):
+            if RE_SKIP_SECTION.match(line_content):
+                in_valid_section = not ctx.hide_dwarf
+            elif RE_CODE_SECTION.match(line_content):
+                in_valid_section = True
+            continue
+
+        if not in_valid_section: continue
+
+        # Mapping
+        loc_match = RE_LOC.match(line_content)
         if loc_match:
-            current_file_idx = int(loc_match.group(1))
-            current_source_line = int(loc_match.group(2))
-            continue
-            
-        # Skip noise and directives
-        if any(re.match(p, line) for p in NOISE_PATTERNS) or re.match(FILE_PATTERN, line):
-            continue
-            
-        if not line.strip():
+            ctx.active_file_id = int(loc_match.group(1))
+            ctx.current_source_line = int(loc_match.group(2))
             continue
 
-        # Keep labels even if we don't have a .loc context yet, 
-        # as they usually precede the first .loc of a function
-        is_label = line.strip().endswith(":")
-        
-        # Only include instructions if they belong to the main source file
-        if current_file_idx in main_file_indices or (is_label and current_file_idx is None):
-            asm_line_idx = len(clean_lines)
-            if current_source_line is not None:
-                line_map[asm_line_idx] = current_source_line
-            clean_lines.append(line)
+        # Block Filtering
+        is_label = stripped.endswith(":")
+        if is_label:
+            if RE_SYSTEM_SYMBOL.search(stripped):
+                in_user_block = not ctx.hide_stl
+                pending_label = None 
+                continue
             
+            if RE_NOISE_LABEL.match(stripped):
+                if ctx.hide_noise: continue
+            else:
+                in_user_block = True
+                pending_label = line_content
+                continue
+
+        if not in_user_block: continue
+
+        # Instruction Filtering
+        if RE_DIRECTIVE.match(line_content) and not is_label:
+            if not RE_DATA_DIRECTIVE.match(line_content):
+                continue
+
+        # Commit
+        if pending_label:
+            formatted_label = re.sub(r"\b_([a-zA-Z0-9_$]+)", r"\1", pending_label)
+            formatted_label = re.sub(r"^\s*[Ll]_", "", formatted_label)
+            if clean_lines:
+                clean_lines.append("")
+            clean_lines.append(formatted_label)
+            pending_label = None
+
+        content = re.sub(r"\b_([a-zA-Z0-9_$]+)", r"\1", line_content)
+        asm_line_idx = len(clean_lines)
+        if ctx.current_source_line is not None:
+            line_map[asm_line_idx] = ctx.current_source_line
+        clean_lines.append(content)
+
     return "\n".join(clean_lines), line_map

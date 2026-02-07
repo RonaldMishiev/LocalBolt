@@ -5,7 +5,7 @@ from typing import Dict, Any
 
 DEFAULT_CONFIG = {
     "compiler": "g++",
-    "opt_level": "-O3",
+    "opt_level": "-O0",
     "flags": []
 }
 
@@ -19,15 +19,15 @@ class ConfigManager:
         if not self.config_dir.exists():
             self.config_dir.mkdir(parents=True)
         
+        config = DEFAULT_CONFIG.copy()
         if self.config_file.exists():
             try:
                 with open(self.config_file, "r") as f:
                     user_cfg = json.load(f)
-                    # Merge with defaults
-                    return {**DEFAULT_CONFIG, **user_cfg}
+                    config.update(user_cfg)
             except:
-                return DEFAULT_CONFIG
-        return DEFAULT_CONFIG
+                pass
+        return config
 
     def save_config(self):
         with open(self.config_file, "w") as f:
