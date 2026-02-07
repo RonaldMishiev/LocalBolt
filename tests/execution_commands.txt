@@ -21,3 +21,4 @@ source .venv/bin/activate
 python -m pip install -e .
 python -m pip install pytest
 python -m pytest tests/test_a.py tests/test_b.py -q
+python -m pytest tests/test_a.py tests/test_a.py -q
