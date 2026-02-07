@@ -181,6 +181,10 @@ class AsmApp(App):
             return self._lines[self._cursor]
         return ""
 
+    def get_line_number(self) -> int:
+        """Return the 1-based line number of the cursor."""
+        return self._cursor + 1
+
 
 def run_asm_app(asm_file: str | Path = DEFAULT_ASM, cycle_counts: dict[int, int] | None = None):
     AsmApp(asm_file, cycle_counts).run()
