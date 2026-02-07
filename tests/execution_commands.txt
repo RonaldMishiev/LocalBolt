@@ -8,21 +8,37 @@ source .venv/bin/activate
 
 pip install -e .
 
-Run the tests 
 
-python3 tests/test_a.py 
-python3 tests/test_b.py
+Unit Tests
+  These test individual components in isolation without requiring external
+  tools like g++ or llvm-mca.
+
+
+    # Run all unit tests
+   for f in tests/unit/test_*.py; do python3 "$f"; done
+   
+   # Individual unit tests
+   python3 tests/unit/test_compiler.py
+   python3 tests/unit/test_config.py
+   python3 tests/unit/test_lexer_stl.py
+   python3 tests/unit/test_parser.py
+
+
+  Integration Tests
+  These test the end-to-end workflow, often involving the filesystem, the
+  real compiler, or system tools.
+
+
+    # Run all integration tests
+    for f in tests/integration/test_*.py; do python3 "$f"; done
+   
+    # Individual integration tests
+    python3 tests/integration/test_engine.py
+    python3 tests/integration/test_lexer.py
+    python3 tests/integration/test_watcher.py
+
+
 
 Samad's local commands for safekeeping: 
 cd /home/samad/Desktop/tartanhacks/tartanhacks
-
-# run tests
-source .venv/bin/activate
-python -m pip install -e .
-python -m pip install pytest
-python -m pytest tests/test_a.py tests/test_b.py -q
-python -m pytest tests/test_a.py tests/test_a.py -q
-python3 tests/test_lexer.py
-python3 tests/test_watcher.py
-python3 tests/test_config.py
 
