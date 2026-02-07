@@ -1,0 +1,44 @@
+# LOCALBOLT EXECUTION GUIDE
+
+## 1. Environment Setup
+To start the virtual environment: 
+python3 -m venv .venv 
+
+Gather all dependencies:
+source .venv/bin/activate
+pip install -e .
+
+## 2. Running the Application
+# Normal mode (Watch a C++ file)
+localbolt hello.cpp
+
+# Assembly Help Mode (CLI manual)
+localbolt --assemblyhelp
+
+## 3. Running Tests
+# Run all tests at once
+./run_all_tests.sh
+
+# Individual Unit Tests
+python3 tests/unit/test_asm_help.py
+python3 tests/unit/test_compiler.py
+python3 tests/unit/test_config.py
+python3 tests/unit/test_lexer_stl.py
+python3 tests/unit/test_parser.py
+
+# Individual Integration Tests
+python3 tests/integration/test_engine.py
+python3 tests/integration/test_lexer.py
+python3 tests/integration/test_watcher.py
+
+## 4. Local Development Paths (Reference)
+cd /home/samad/Desktop/tartanhacks/tartanhacks
+source .venv/bin/activate
+export PYTHONPATH=src
+
+## 5. Python Package Dependencies
+textual>=0.47.1
+watchdog>=3.0.0
+pygments>=2.17.2
+rich>=13.7.0
+pytest>=7.0.0
