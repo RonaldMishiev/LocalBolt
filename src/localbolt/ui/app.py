@@ -1,69 +1,51 @@
 """
 Member C — Main Textual Application
 ====================================
-Owns the master pipeline: compile → map → highlight → display.
-Watches the source file for changes via Watchdog.
+Assembly-only viewer with live recompilation on file save.
 
-The UI displays only the assembly output.  The user edits their
-C++ file in their own IDE; saves are detected by Watchdog and
-the assembly view updates automatically.
+Integrates with main branch architecture:
+  - BoltEngine (engine.py) handles compile → parse → analyze pipeline
+  - LocalBoltState holds all application data
+  - FileWatcher (utils/watcher.py) detects file saves
+  - highlight_asm / build_gutter (utils/highlighter.py) for rendering
+
+The user edits their C++ file in their own IDE; saves are detected
+and the assembly view updates automatically.
 """
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
-from typing import Optional
 
 from textual.app import App, ComposeResult
-from textual.widgets import Header
-from watchdog.events import FileSystemEventHandler, FileModifiedEvent
-from watchdog.observers import Observer
+from textual.widgets import Header, Footer
+from textual.message import Message
 
-from localbolt.ui.widgets import (
-    AssemblyView,
-    StatusBar,
-)
-
-# Lazy-import path strings for teammates' modules (may still be stubs)
-_DRIVER = "localbolt.compiler.driver"
-_MAPPER = "localbolt.parsing.mapper"
-_HIGHLIGHTER = "localbolt.utils.highlighter"
-_CONFIG = "localbolt.utils.config"
+from localbolt.ui.widgets import AssemblyView, StatusBar
 
 
-# ────────────────────────────────────────────────────────────
-# File-change handler (Watchdog → Textual bridge)
-# ────────────────────────────────────────────────────────────
-class _SourceFileHandler(FileSystemEventHandler):
-    """Watchdog handler that posts a callback into the Textual event loop."""
-
-    def __init__(self, app: "LocalBoltApp", watched_path: str) -> None:
-        super().__init__()
-        self._app = app
-        self._watched = Path(watched_path).resolve()
-
-    def on_modified(self, event: FileModifiedEvent) -> None:  # type: ignore[override]
-        if Path(event.src_path).resolve() == self._watched:
-            # Schedule the async handler on the Textual event loop
-            self._app.call_from_thread(self._app.trigger_recompile)
-
-
-# ────────────────────────────────────────────────────────────
-# The App
-# ────────────────────────────────────────────────────────────
 class LocalBoltApp(App):
     """LocalBolt — a local Compiler Explorer in your terminal."""
 
     CSS_PATH = "styles.tcss"
     TITLE = "LocalBolt"
 
-    def __init__(self, source_file: str, flags: list[str] | None = None) -> None:
+    from textual.binding import Binding
+    BINDINGS = [
+        Binding("q", "quit", "Quit", show=True),
+        Binding("r", "refresh", "Recompile", show=True),
+    ]
+
+    class StateUpdated(Message):
+        """Posted by the engine callback when a recompile finishes."""
+        def __init__(self, state) -> None:
+            super().__init__()
+            self.state = state
+
+    def __init__(self, source_file: str) -> None:
         super().__init__()
         self.source_file: str = str(Path(source_file).resolve())
-        self.flags: list[str] = flags or ["-O0"]
-        self.current_mapping = None
-        self._observer: Optional[Observer] = None  # type: ignore[valid-type]
+        self.engine = None  # Will be set in on_mount if engine is available
 
     # -- compose the widget tree ----------------------------------
 
@@ -71,22 +53,34 @@ class LocalBoltApp(App):
         yield Header()
         yield AssemblyView()
         yield StatusBar()
+        yield Footer()
 
     # -- lifecycle ------------------------------------------------
 
-    async def on_mount(self) -> None:
+    def on_mount(self) -> None:
         self.status_bar.set_status(
             file=Path(self.source_file).name,
-            flags=" ".join(self.flags),
-            status="watching",
+            status="starting",
         )
-        # Start watching for saves
-        self._start_watcher()
-        # Initial compile
-        await self.on_file_changed(self.source_file)
+        # Try to import and start the engine (main branch's BoltEngine)
+        try:
+            from localbolt.engine import BoltEngine
+            self.engine = BoltEngine(self.source_file)
+            self.engine.on_update_callback = (
+                lambda state: self.post_message(self.StateUpdated(state))
+            )
+            self.engine.start()
+            self.status_bar.set_status(status="watching")
+            self.notify(f"Monitoring {self.source_file}")
+        except Exception as exc:
+            self._show_error(f"Engine init error: {exc}")
 
     def on_unmount(self) -> None:
-        self._stop_watcher()
+        if self.engine is not None:
+            try:
+                self.engine.stop()
+            except Exception:
+                pass
 
     # -- convenience accessors ------------------------------------
 
@@ -98,94 +92,67 @@ class LocalBoltApp(App):
     def status_bar(self) -> StatusBar:
         return self.query_one("#status-bar", StatusBar)
 
-    # -- watcher --------------------------------------------------
+    # -- handle engine state updates ------------------------------
 
-    def _start_watcher(self) -> None:
-        handler = _SourceFileHandler(self, self.source_file)
-        self._observer = Observer()
-        self._observer.schedule(
-            handler,
-            path=str(Path(self.source_file).parent),
-            recursive=False,
-        )
-        self._observer.daemon = True
-        self._observer.start()
+    def on_local_bolt_app_state_updated(self, message: StateUpdated) -> None:
+        """Called when BoltEngine finishes a compile/parse cycle."""
+        state = message.state
 
-    def _stop_watcher(self) -> None:
-        if self._observer is not None:
-            self._observer.stop()
-
-    # -- public entry point for recompile -------------------------
-
-    def trigger_recompile(self) -> None:
-        """Called from the Watchdog thread via call_from_thread."""
-        asyncio.ensure_future(self.on_file_changed(self.source_file))
-
-    # ============================================================
-    # MASTER PIPELINE  (compile → map → highlight → display)
-    # ============================================================
-
-    async def on_file_changed(self, file_path: str) -> None:
-        """
-        The master pipeline.  Called on launch and every time the
-        watched source file is saved.
-        """
-        import importlib
-
-        self.status_bar.set_status(status="compiling…")
-
-        # --- 1. Compile (Member A) --------------------------------
+        # Render the assembly
         try:
-            driver = importlib.import_module(_DRIVER)
-            result = driver.compile_source(file_path, self.flags)
-        except Exception as exc:
-            self._show_error(f"Compile error: {exc}")
-            return
+            from localbolt.utils.highlighter import highlight_asm, build_gutter
+            from localbolt.parsing.perf_parser import InstructionStats
 
-        if not result.success:
-            self._show_error(result.stderr)
-            return
+            asm_lines = state.asm_content.splitlines() if state.asm_content else []
 
-        # --- 2. Map (Member B) ------------------------------------
-        try:
-            mapper = importlib.import_module(_MAPPER)
-            mapping = mapper.parse_mapping(result.asm_content)
-        except Exception as exc:
-            self._show_error(f"Mapping error: {exc}")
-            return
+            if asm_lines:
+                # build_gutter returns a combined Rich Text with highlighting + cycles
+                cycle_counts = {}
+                for idx, stats in state.perf_stats.items():
+                    cycle_counts[idx] = stats.latency
+                rendered = build_gutter(asm_lines, cycle_counts)
+                self.assembly_view.set_asm(rendered)
+            else:
+                from rich.text import Text
+                self.assembly_view.set_asm(Text(state.asm_content or "(no assembly)"))
 
-        # --- 3. Analyze (Member A — optional) ---------------------
-        analysis = None
-        try:
-            driver = importlib.import_module(_DRIVER)
-            analysis = driver.analyze_assembly(result.asm_content)
         except Exception:
-            pass  # llvm-mca may not be installed; gracefully skip
-
-        # --- 4. Highlight (Member D) ------------------------------
-        try:
-            highlighter = importlib.import_module(_HIGHLIGHTER)
-            highlighted = highlighter.highlight_asm(mapping.cleaned_asm)
-        except Exception:
-            # Fallback: show raw cleaned asm
+            # Fallback: just show raw asm text
             from rich.text import Text
+            self.assembly_view.set_asm(
+                Text(state.asm_content or "(no assembly)")
+            )
 
-            highlighted = Text(mapping.cleaned_asm)
+        # Update status bar
+        if state.compiler_output and "error" in state.compiler_output.lower():
+            self.status_bar.set_status(status="error", errors=1)
+            self.notify("Compilation error", severity="error")
+        elif state.compiler_output and "warning" in state.compiler_output.lower():
+            self.status_bar.set_status(status="ready", errors=0)
+            self.notify("Recompiled with warnings", severity="warning")
+        else:
+            self.status_bar.set_status(status="ready", errors=0)
+            self.notify("Updated")
 
-        # --- 5. Update UI -----------------------------------------
-        self.assembly_view.set_asm(highlighted)
+    # -- actions --------------------------------------------------
 
-        # --- 6. Store mapping for scroll sync ---------------------
-        self.current_mapping = mapping
-
-        self.status_bar.set_status(status="ready", errors=0)
+    def action_refresh(self) -> None:
+        """Keybinding 'r' -> manual recompile."""
+        if self.engine is not None:
+            self.status_bar.set_status(status="compiling…")
+            self.engine.refresh()
+        else:
+            self._show_error("Engine not initialized")
 
     # -- helpers ---------------------------------------------------
 
     def _show_error(self, text: str) -> None:
         self.status_bar.set_status(status="error", errors=1)
-        self.assembly_view.set_asm(
-            __import__("rich.text", fromlist=["Text"]).Text(
-                text, style="bold red"
-            )
-        )
+        from rich.text import Text
+        self.assembly_view.set_asm(Text(text, style="bold red"))
+
+
+def run_tui(source_file: str):
+    """Entry point called by main.py — matches main branch interface."""
+    app = LocalBoltApp(source_file)
+    app.run()

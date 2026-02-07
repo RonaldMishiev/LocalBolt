@@ -1,14 +1,7 @@
 try:
-    from .parsing.lexer import clean_assembly
-    from .parsing.mapper import demangle_stream
+    from .parsing import process_assembly
 
-    def process_assembly(raw_asm: str) -> str:
-        """
-        Pipeline: Raw Garbage -> Cleaned -> Demangled -> Human Readable
-        """
-        cleaned = clean_assembly(raw_asm)
-        demangled = demangle_stream(cleaned)
-        return demangled
+    __all__ = ["process_assembly"]
 except ImportError:
     # Teammate modules may not be wired up yet; allow partial imports
-    pass
+    __all__ = []

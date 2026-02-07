@@ -1,19 +1,20 @@
 """
 Tests for Member C — app.py
 =============================
-Tests the LocalBoltApp wiring logic with MOCKED teammate modules.
-Member A, B, and D are fully faked so these tests run standalone.
+Tests the LocalBoltApp UI wiring logic with MOCKED engine.
 
-The UI is assembly-only: no SourceView, no GutterColumn, no scroll sync.
+The engine (BoltEngine) is completely mocked — these tests verify
+that Member C's UI layer works correctly in isolation:
+  - Widget tree composition
+  - Status bar updates
+  - Error display
+  - State update message handling
 
-NOTE: The Watchdog Observer is patched out in every async test so
-that no real OS file-watcher threads are started (those threads
-cause hangs under pytest).
+All teammate modules are faked so these tests run standalone.
 """
 
 from __future__ import annotations
 
-import importlib
 import sys
 import tempfile
 import types
@@ -24,129 +25,100 @@ from unittest.mock import MagicMock, patch
 import pytest
 from rich.text import Text
 
-from localbolt.ui.widgets import (
-    AssemblyView,
-    StatusBar,
-)
+from localbolt.ui.widgets import AssemblyView, StatusBar
 
 
 # ────────────────────────────────────────────────────────────
-# Patch helper — disable Watchdog so tests don't hang
-# ────────────────────────────────────────────────────────────
-_PATCH_WATCHER = patch(
-    "localbolt.ui.app.Observer", new_callable=lambda: type(
-        "FakeObserver",
-        (),
-        {
-            "__init__": lambda self: None,
-            "schedule": lambda self, *a, **kw: None,
-            "start": lambda self: None,
-            "stop": lambda self: None,
-            "__setattr__": lambda self, k, v: object.__setattr__(self, k, v),
-        },
-    ),
-)
-
-
-# ────────────────────────────────────────────────────────────
-# Fake dataclasses mimicking teammates' interfaces
+# Fake state/engine matching main branch interfaces
 # ────────────────────────────────────────────────────────────
 @dataclass
-class FakeCompileResult:
-    success: bool = True
-    asm_content: str = "mov rax, rbx\nret\n"
-    stderr: str = ""
-    flags_used: list[str] = field(default_factory=lambda: ["-O0"])
+class FakeInstructionStats:
+    latency: int = 1
+    uops: float = 0.5
+    throughput: float = 0.5
 
 
 @dataclass
-class FakeMappingResult:
-    source_to_asm: dict[int, list[int]] = field(
-        default_factory=lambda: {1: [1, 2], 2: [3]}
-    )
-    asm_to_source: dict[int, int] = field(
-        default_factory=lambda: {1: 1, 2: 1, 3: 2}
-    )
-    cleaned_asm: str = "mov rax, rbx\nadd rax, 1\nret"
-    cleaned_asm_lines: list[str] = field(
-        default_factory=lambda: ["mov rax, rbx", "add rax, 1", "ret"]
-    )
+class FakeState:
+    source_path: str = ""
+    source_code: str = ""
+    asm_content: str = "push rbp\nmov rbp, rsp\nret"
+    asm_mapping: dict = field(default_factory=dict)
+    perf_stats: dict = field(default_factory=dict)
+    raw_mca_output: str = ""
+    compiler_output: str = ""
+    is_dirty: bool = False
+    last_update: float = 0.0
 
 
-@dataclass
-class FakeAnalysisResult:
-    success: bool = True
-    raw_output: str = ""
-    cycle_counts: dict[int, int] = field(
-        default_factory=lambda: {1: 1, 2: 3, 3: 1}
-    )
-    total_cycles: int = 5
+class FakeEngine:
+    """Mimics BoltEngine from main's engine.py."""
+
+    def __init__(self, source_file: str):
+        self.state = FakeState(source_path=source_file)
+        self.on_update_callback = None
+        self._started = False
+        self._refreshed = False
+
+    def start(self):
+        self._started = True
+        # Trigger the callback as the real engine would on initial compile
+        if self.on_update_callback:
+            self.on_update_callback(self.state)
+
+    def stop(self):
+        pass
+
+    def refresh(self):
+        self._refreshed = True
+        if self.on_update_callback:
+            self.on_update_callback(self.state)
 
 
 # ────────────────────────────────────────────────────────────
-# Build fake modules to inject into sys.modules
+# Inject fake teammate modules into sys.modules
 # ────────────────────────────────────────────────────────────
-def _make_fake_driver(
-    compile_result: FakeCompileResult | None = None,
-    analysis_result: FakeAnalysisResult | None = None,
-):
-    """Return a fake 'localbolt.compiler.driver' module."""
-    mod = types.ModuleType("localbolt.compiler.driver")
-    mod.compile_source = MagicMock(
-        return_value=compile_result or FakeCompileResult()
-    )
-    mod.analyze_assembly = MagicMock(
-        return_value=analysis_result or FakeAnalysisResult()
-    )
-    return mod
+def _inject_fakes(engine_instance=None):
+    """
+    Inject fake versions of all teammate modules.
+    Returns (fakes_dict, cleanup_function).
+    """
+    # Fake localbolt.engine
+    engine_mod = types.ModuleType("localbolt.engine")
+    if engine_instance is not None:
+        engine_mod.BoltEngine = lambda source_file: engine_instance
+    else:
+        engine_mod.BoltEngine = FakeEngine
 
+    # Fake localbolt.utils.highlighter
+    hl_mod = types.ModuleType("localbolt.utils.highlighter")
+    hl_mod.highlight_asm = MagicMock(return_value=Text("push rbp\nmov rbp, rsp\nret"))
+    hl_mod.build_gutter = MagicMock(return_value=Text("push rbp\nmov rbp, rsp\nret"))
 
-def _make_fake_mapper(mapping_result: FakeMappingResult | None = None):
-    """Return a fake 'localbolt.parsing.mapper' module."""
-    mod = types.ModuleType("localbolt.parsing.mapper")
-    mod.parse_mapping = MagicMock(
-        return_value=mapping_result or FakeMappingResult()
-    )
-    return mod
+    # Fake localbolt.parsing.perf_parser
+    pp_mod = types.ModuleType("localbolt.parsing.perf_parser")
+    pp_mod.InstructionStats = FakeInstructionStats
 
+    # Fake localbolt.utils.state
+    state_mod = types.ModuleType("localbolt.utils.state")
+    state_mod.LocalBoltState = FakeState
 
-def _make_fake_highlighter():
-    """Return a fake 'localbolt.utils.highlighter' module."""
-    mod = types.ModuleType("localbolt.utils.highlighter")
-    mod.highlight_asm = MagicMock(
-        return_value=Text("mov rax, rbx\nadd rax, 1\nret")
-    )
-    return mod
+    # Fake localbolt.utils.watcher
+    watcher_mod = types.ModuleType("localbolt.utils.watcher")
 
-
-def _make_fake_config():
-    """Return a fake 'localbolt.utils.config' module."""
-    mod = types.ModuleType("localbolt.utils.config")
-    return mod
-
-
-def _inject_fakes(
-    compile_result=None,
-    analysis_result=None,
-    mapping_result=None,
-):
-    """Inject all fake teammate modules into sys.modules. Returns cleanup fn."""
+    # Ensure parent package modules exist
     fakes = {
-        "localbolt.compiler": types.ModuleType("localbolt.compiler"),
-        "localbolt.compiler.driver": _make_fake_driver(compile_result, analysis_result),
-        "localbolt.parsing": types.ModuleType("localbolt.parsing"),
-        "localbolt.parsing.mapper": _make_fake_mapper(mapping_result),
-        "localbolt.utils": types.ModuleType("localbolt.utils"),
-        "localbolt.utils.highlighter": _make_fake_highlighter(),
-        "localbolt.utils.config": _make_fake_config(),
+        "localbolt.engine": engine_mod,
+        "localbolt.utils.highlighter": hl_mod,
+        "localbolt.utils.state": state_mod,
+        "localbolt.utils.watcher": watcher_mod,
+        "localbolt.parsing.perf_parser": pp_mod,
     }
+
     originals = {}
     for name, mod in fakes.items():
         originals[name] = sys.modules.get(name)
         sys.modules[name] = mod
-
-    # Clear importlib caches so import_module finds our fakes
-    importlib.invalidate_caches()
 
     def cleanup():
         for name in fakes:
@@ -154,7 +126,6 @@ def _inject_fakes(
                 sys.modules.pop(name, None)
             else:
                 sys.modules[name] = originals[name]
-        importlib.invalidate_caches()
 
     return fakes, cleanup
 
@@ -181,12 +152,11 @@ class TestAppComposition:
         tmp = _make_tmp_cpp()
         fakes, cleanup = _inject_fakes()
         try:
-            with _PATCH_WATCHER:
-                from localbolt.ui.app import LocalBoltApp
-                app = LocalBoltApp(source_file=tmp, flags=["-O0"])
-                async with app.run_test(size=(120, 40)) as pilot:
-                    av = pilot.app.query_one("#assembly-view", AssemblyView)
-                    assert av is not None
+            from localbolt.ui.app import LocalBoltApp
+            app = LocalBoltApp(source_file=tmp)
+            async with app.run_test(size=(120, 40)) as pilot:
+                av = pilot.app.query_one("#assembly-view", AssemblyView)
+                assert av is not None
         finally:
             cleanup()
             Path(tmp).unlink(missing_ok=True)
@@ -196,28 +166,26 @@ class TestAppComposition:
         tmp = _make_tmp_cpp()
         fakes, cleanup = _inject_fakes()
         try:
-            with _PATCH_WATCHER:
-                from localbolt.ui.app import LocalBoltApp
-                app = LocalBoltApp(source_file=tmp, flags=["-O0"])
-                async with app.run_test(size=(120, 40)) as pilot:
-                    sb = pilot.app.query_one("#status-bar", StatusBar)
-                    assert sb is not None
+            from localbolt.ui.app import LocalBoltApp
+            app = LocalBoltApp(source_file=tmp)
+            async with app.run_test(size=(120, 40)) as pilot:
+                sb = pilot.app.query_one("#status-bar", StatusBar)
+                assert sb is not None
         finally:
             cleanup()
             Path(tmp).unlink(missing_ok=True)
 
     @pytest.mark.asyncio
     async def test_app_has_no_source_view(self):
-        """SourceView should NOT be in the widget tree."""
+        """SourceView should NOT be in the widget tree (assembly-only UI)."""
         tmp = _make_tmp_cpp()
         fakes, cleanup = _inject_fakes()
         try:
-            with _PATCH_WATCHER:
-                from localbolt.ui.app import LocalBoltApp
-                app = LocalBoltApp(source_file=tmp, flags=["-O0"])
-                async with app.run_test(size=(120, 40)) as pilot:
-                    results = pilot.app.query("#source-view")
-                    assert len(results) == 0
+            from localbolt.ui.app import LocalBoltApp
+            app = LocalBoltApp(source_file=tmp)
+            async with app.run_test(size=(120, 40)) as pilot:
+                results = pilot.app.query("#source-view")
+                assert len(results) == 0
         finally:
             cleanup()
             Path(tmp).unlink(missing_ok=True)
@@ -231,135 +199,154 @@ class TestAppInit:
 
     def test_stores_source_file(self):
         from localbolt.ui.app import LocalBoltApp
-        app = LocalBoltApp(source_file="/tmp/test.cpp", flags=["-O2"])
+        app = LocalBoltApp(source_file="/tmp/test.cpp")
         assert app.source_file.endswith("test.cpp")
 
-    def test_stores_flags(self):
-        from localbolt.ui.app import LocalBoltApp
-        app = LocalBoltApp(source_file="/tmp/test.cpp", flags=["-O3", "-ffast-math"])
-        assert app.flags == ["-O3", "-ffast-math"]
-
-    def test_default_flags(self):
+    def test_engine_starts_none(self):
         from localbolt.ui.app import LocalBoltApp
         app = LocalBoltApp(source_file="/tmp/test.cpp")
-        assert app.flags == ["-O0"]
-
-    def test_mapping_starts_none(self):
-        from localbolt.ui.app import LocalBoltApp
-        app = LocalBoltApp(source_file="/tmp/test.cpp")
-        assert app.current_mapping is None
+        assert app.engine is None
 
 
 # ────────────────────────────────────────────────────────────
-# Pipeline tests (mocked teammates)
+# Engine integration tests (mocked engine)
 # ────────────────────────────────────────────────────────────
-class TestPipeline:
-    """Test on_file_changed with mocked teammate modules."""
+class TestEngineIntegration:
+    """Test that the app correctly wires up to BoltEngine."""
 
     @pytest.mark.asyncio
-    async def test_successful_pipeline_stores_mapping(self):
-        """After a successful compile, current_mapping should be set."""
+    async def test_engine_is_started_on_mount(self):
+        """The engine should be started when the app mounts."""
         tmp = _make_tmp_cpp()
-        mapping = FakeMappingResult()
-        fakes, cleanup = _inject_fakes(mapping_result=mapping)
+        engine = FakeEngine(tmp)
+        fakes, cleanup = _inject_fakes(engine_instance=engine)
         try:
-            with _PATCH_WATCHER:
-                from localbolt.ui.app import LocalBoltApp
-                app = LocalBoltApp(source_file=tmp, flags=["-O0"])
-                async with app.run_test(size=(120, 40)) as pilot:
-                    await pilot.pause()
-                    assert pilot.app.current_mapping is not None
-                    assert pilot.app.current_mapping.source_to_asm == mapping.source_to_asm
+            from localbolt.ui.app import LocalBoltApp
+            app = LocalBoltApp(source_file=tmp)
+            async with app.run_test(size=(120, 40)) as pilot:
+                await pilot.pause()
+                assert engine._started
         finally:
             cleanup()
             Path(tmp).unlink(missing_ok=True)
 
     @pytest.mark.asyncio
-    async def test_compile_failure_shows_error(self):
-        """When compile_source returns success=False, status should be 'error'."""
+    async def test_status_shows_ready_after_update(self):
+        """After engine state update, status should be 'ready'."""
         tmp = _make_tmp_cpp()
-        bad_result = FakeCompileResult(success=False, stderr="undefined reference")
-        fakes, cleanup = _inject_fakes(compile_result=bad_result)
+        engine = FakeEngine(tmp)
+        fakes, cleanup = _inject_fakes(engine_instance=engine)
         try:
-            with _PATCH_WATCHER:
-                from localbolt.ui.app import LocalBoltApp
-                app = LocalBoltApp(source_file=tmp, flags=["-O0"])
-                async with app.run_test(size=(120, 40)) as pilot:
-                    await pilot.pause()
-                    sb = pilot.app.query_one("#status-bar", StatusBar)
-                    assert sb._status == "error"
-                    assert sb._errors == 1
+            from localbolt.ui.app import LocalBoltApp
+            app = LocalBoltApp(source_file=tmp)
+            async with app.run_test(size=(120, 40)) as pilot:
+                await pilot.pause()
+                sb = pilot.app.query_one("#status-bar", StatusBar)
+                assert sb._status == "ready"
+                assert sb._errors == 0
         finally:
             cleanup()
             Path(tmp).unlink(missing_ok=True)
 
     @pytest.mark.asyncio
-    async def test_compile_calls_driver(self):
-        """compile_source should be called with the file and flags."""
+    async def test_compiler_error_shows_error_status(self):
+        """When compiler_output contains 'error', status should be 'error'."""
         tmp = _make_tmp_cpp()
-        fakes, cleanup = _inject_fakes()
+        engine = FakeEngine(tmp)
+        engine.state.compiler_output = "fatal error: file not found"
+        fakes, cleanup = _inject_fakes(engine_instance=engine)
         try:
-            with _PATCH_WATCHER:
-                from localbolt.ui.app import LocalBoltApp
-                app = LocalBoltApp(source_file=tmp, flags=["-O2"])
-                async with app.run_test(size=(120, 40)) as pilot:
-                    await pilot.pause()
-                    driver = fakes["localbolt.compiler.driver"]
-                    driver.compile_source.assert_called()
-                    call_args = driver.compile_source.call_args
-                    assert call_args[0][1] == ["-O2"]
+            from localbolt.ui.app import LocalBoltApp
+            app = LocalBoltApp(source_file=tmp)
+            async with app.run_test(size=(120, 40)) as pilot:
+                await pilot.pause()
+                sb = pilot.app.query_one("#status-bar", StatusBar)
+                assert sb._status == "error"
+                assert sb._errors == 1
         finally:
             cleanup()
             Path(tmp).unlink(missing_ok=True)
 
     @pytest.mark.asyncio
-    async def test_mapper_called_with_asm(self):
-        """parse_mapping should be called with the asm from compile_source."""
+    async def test_assembly_view_gets_content(self):
+        """After a state update, the assembly view should have content."""
         tmp = _make_tmp_cpp()
-        fakes, cleanup = _inject_fakes()
+        engine = FakeEngine(tmp)
+        engine.state.asm_content = "push rbp\nmov rbp, rsp\npop rbp\nret"
+        fakes, cleanup = _inject_fakes(engine_instance=engine)
         try:
-            with _PATCH_WATCHER:
-                from localbolt.ui.app import LocalBoltApp
-                app = LocalBoltApp(source_file=tmp, flags=["-O0"])
-                async with app.run_test(size=(120, 40)) as pilot:
-                    await pilot.pause()
-                    mapper = fakes["localbolt.parsing.mapper"]
-                    mapper.parse_mapping.assert_called()
+            from localbolt.ui.app import LocalBoltApp
+            app = LocalBoltApp(source_file=tmp)
+            async with app.run_test(size=(120, 40)) as pilot:
+                await pilot.pause()
+                # Highlighter was called
+                hl = fakes["localbolt.utils.highlighter"]
+                assert hl.build_gutter.called or hl.highlight_asm.called
         finally:
             cleanup()
             Path(tmp).unlink(missing_ok=True)
 
     @pytest.mark.asyncio
-    async def test_highlighter_called(self):
-        """highlight_asm should be called with the cleaned assembly."""
+    async def test_action_refresh_calls_engine(self):
+        """Pressing 'r' should call engine.refresh()."""
         tmp = _make_tmp_cpp()
-        fakes, cleanup = _inject_fakes()
+        engine = FakeEngine(tmp)
+        fakes, cleanup = _inject_fakes(engine_instance=engine)
         try:
-            with _PATCH_WATCHER:
-                from localbolt.ui.app import LocalBoltApp
-                app = LocalBoltApp(source_file=tmp, flags=["-O0"])
-                async with app.run_test(size=(120, 40)) as pilot:
-                    await pilot.pause()
-                    hl = fakes["localbolt.utils.highlighter"]
-                    hl.highlight_asm.assert_called()
+            from localbolt.ui.app import LocalBoltApp
+            app = LocalBoltApp(source_file=tmp)
+            async with app.run_test(size=(120, 40)) as pilot:
+                await pilot.pause()
+                engine._refreshed = False  # reset after initial
+                await pilot.press("r")
+                await pilot.pause()
+                assert engine._refreshed
         finally:
             cleanup()
             Path(tmp).unlink(missing_ok=True)
 
     @pytest.mark.asyncio
-    async def test_status_ready_after_success(self):
-        """After a successful pipeline, status should be 'ready'."""
+    async def test_engine_failure_shows_error(self):
+        """If engine import fails, the app should show an error gracefully."""
         tmp = _make_tmp_cpp()
-        fakes, cleanup = _inject_fakes()
+        # Don't inject engine fake — let the import fail
+        engine_mod = types.ModuleType("localbolt.engine")
+
+        def bad_engine(source_file):
+            raise RuntimeError("Engine not available")
+
+        engine_mod.BoltEngine = bad_engine
+        originals = {
+            "localbolt.engine": sys.modules.get("localbolt.engine"),
+        }
+        sys.modules["localbolt.engine"] = engine_mod
         try:
-            with _PATCH_WATCHER:
-                from localbolt.ui.app import LocalBoltApp
-                app = LocalBoltApp(source_file=tmp, flags=["-O0"])
-                async with app.run_test(size=(120, 40)) as pilot:
-                    await pilot.pause()
-                    sb = pilot.app.query_one("#status-bar", StatusBar)
-                    assert sb._status == "ready"
-                    assert sb._errors == 0
+            from localbolt.ui.app import LocalBoltApp
+            app = LocalBoltApp(source_file=tmp)
+            async with app.run_test(size=(120, 40)) as pilot:
+                await pilot.pause()
+                sb = pilot.app.query_one("#status-bar", StatusBar)
+                assert sb._status == "error"
         finally:
-            cleanup()
+            if originals["localbolt.engine"] is None:
+                sys.modules.pop("localbolt.engine", None)
+            else:
+                sys.modules["localbolt.engine"] = originals["localbolt.engine"]
             Path(tmp).unlink(missing_ok=True)
+
+
+# ────────────────────────────────────────────────────────────
+# run_tui function test
+# ────────────────────────────────────────────────────────────
+class TestRunTui:
+    """Test the run_tui entry point."""
+
+    def test_run_tui_creates_app(self):
+        """run_tui should create a LocalBoltApp and call run()."""
+        with patch("localbolt.ui.app.LocalBoltApp") as MockApp:
+            mock_instance = MagicMock()
+            MockApp.return_value = mock_instance
+            from localbolt.ui.app import run_tui
+            run_tui("/tmp/test.cpp")
+            MockApp.assert_called_once_with("/tmp/test.cpp")
+            mock_instance.run.assert_called_once()

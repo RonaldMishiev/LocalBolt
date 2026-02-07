@@ -1,11 +1,12 @@
 /*
  * LocalBolt — Layout
- * Assembly-only view with a status bar at the bottom.
+ * Assembly-only view with status bar and footer.
  * Member D will add colors/themes on top of this.
  */
 
 Screen {
     layout: vertical;
+    background: #1e1e1e;
 }
 
 #assembly-view {
