@@ -65,7 +65,7 @@ class BoltEngine:
                 self._log("Running analyze_perf on mangled ASM...")
                 mca_raw = self.driver.analyze_perf(mangled_asm)
                 self._log(f"MCA Raw Length: {len(mca_raw) if mca_raw else 0}")
-                
+
                 if mca_raw and "Instruction Info:" in mca_raw:
                     perf_stats = parse_mca_output(mca_raw)
                     self._log(f"Parsed Stats Count: {len(perf_stats)}")

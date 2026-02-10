@@ -1,0 +1,300 @@
+HOWDY
+HOWDY
+llvm-mca error: <stdin>:74:5: error: assembler local symbol 'LBB1_1' not defined
+        ret
+           ^
+<stdin>:74:5: error: assembler local symbol 'LBB1_2' not defined
+        ret
+           ^
+<stdin>:74:5: error: assembler local symbol 'LBB1_4' not defined
+        ret
+           ^
+<stdin>:74:5: error: assembler local symbol 'LBB1_3' not defined
+        ret
+           ^
+<stdin>:74:5: error: assembler local symbol 'LBB1_5' not defined
+        ret
+           ^
+error: Assembly input parsing had errors, use -skip-unsupported-instructions=parse-failure to drop failing lines from the input.
+HOWDY
+llvm-mca error: <stdin>:74:5: error: assembler local symbol 'LBB1_1' not defined
+        ret
+           ^
+<stdin>:74:5: error: assembler local symbol 'LBB1_2' not defined
+        ret
+           ^
+<stdin>:74:5: error: assembler local symbol 'LBB1_4' not defined
+        ret
+           ^
+<stdin>:74:5: error: assembler local symbol 'LBB1_3' not defined
+        ret
+           ^
+<stdin>:74:5: error: assembler local symbol 'LBB1_5' not defined
+        ret
+           ^
+error: Assembly input parsing had errors, use -skip-unsupported-instructions=parse-failure to drop failing lines from the input.
+HOWDY
+Iterations:        100
+Instructions:      6900
+Total Cycles:      4012
+Total uOps:        7300
+
+Dispatch Width:    6
+uOps Per Cycle:    1.82
+IPC:               1.72
+Block RThroughput: 40.0
+
+
+Instruction Info:
+[1]: #uOps
+[2]: Latency
+[3]: RThroughput
+[4]: MayLoad
+[5]: MayStore
+[6]: HasSideEffects (U)
+
+[1]    [2]    [3]    [4]    [5]    [6]    Instructions:
+ 1      1     0.25                        sub	sp, sp, #16
+ 1      4     0.50           *            str	w0, [sp, #12]
+ 1      4     0.50           *            str	w1, [sp, #8]
+ 1      4     0.50    *                   ldr	w8, [sp, #12]
+ 1      4     0.50    *                   ldr	w10, [sp, #8]
+ 1      10    10.00                       sdiv	w9, w8, w10
+ 1      4     1.00                        mul	w9, w9, w10
+ 1      2     1.00                        subs	w0, w8, w9
+ 1      1     0.25                        add	sp, sp, #16
+ 1      0     1.00                  U     ret
+ 1      1     0.25                        sub	sp, sp, #32
+ 2      6     0.50           *            stp	x29, x30, [sp, #16]
+ 1      1     0.25                        add	x29, sp, #16
+ 1      4     0.50           *            str	w0, [sp, #8]
+ 1      4     0.50           *            str	w1, [sp, #4]
+ 1      4     0.50    *                   ldr	w8, [sp, #4]
+ 1      0     0.50                        cbnz	w8, LBB1_2
+ 1      0     0.50                        b	LBB1_1
+ 1      1     0.25                        mov	w8, #1
+ 1      4     0.50           *            stur	w8, [x29, #-4]
+ 1      0     0.50                        b	LBB1_5
+ 1      4     0.50    *                   ldr	w8, [sp, #4]
+ 1      1     0.25                        mov	w10, #2
+ 1      10    10.00                       sdiv	w9, w8, w10
+ 1      4     1.00                        mul	w9, w9, w10
+ 1      2     1.00                        subs	w8, w8, w9
+ 1      0     0.50                        cbnz	w8, LBB1_4
+ 1      0     0.50                        b	LBB1_3
+ 1      4     0.50    *                   ldr	w8, [sp, #8]
+ 1      4     0.50    *                   ldr	w9, [sp, #8]
+ 1      4     1.00                        mul	w0, w8, w9
+ 1      4     0.50    *                   ldr	w8, [sp, #4]
+ 1      1     0.25                        mov	w9, #2
+ 1      10    10.00                       sdiv	w1, w8, w9
+ 1      0     0.50                        bl	_Z6binexpii
+ 1      4     0.50           *            stur	w0, [x29, #-4]
+ 1      0     0.50                        b	LBB1_5
+ 1      4     0.50    *                   ldr	w8, [sp, #8]
+ 1      4     0.50           *            str	w8, [sp]
+ 1      4     0.50    *                   ldr	w8, [sp, #8]
+ 1      4     0.50    *                   ldr	w9, [sp, #8]
+ 1      4     1.00                        mul	w0, w8, w9
+ 1      4     0.50    *                   ldr	w8, [sp, #4]
+ 1      1     0.25                        mov	w9, #2
+ 1      10    10.00                       sdiv	w1, w8, w9
+ 1      0     0.50                        bl	_Z6binexpii
+ 1      4     0.50    *                   ldr	w8, [sp]
+ 1      4     1.00                        mul	w8, w8, w0
+ 1      4     0.50           *            stur	w8, [x29, #-4]
+ 1      0     0.50                        b	LBB1_5
+ 1      4     0.50    *                   ldur	w0, [x29, #-4]
+ 2      4     0.50    *                   ldp	x29, x30, [sp, #16]
+ 1      1     0.25                        add	sp, sp, #32
+ 1      0     1.00                  U     ret
+ 1      1     0.25                        sub	sp, sp, #32
+ 2      6     0.50           *            stp	x29, x30, [sp, #16]
+ 1      1     0.25                        add	x29, sp, #16
+ 1      4     0.50           *            stur	wzr, [x29, #-4]
+ 1      1     0.25                        adrp	x0, _ZNSt3__14coutE@GOTPAGE
+ 1      4     0.50    *                   ldr	x0, [x0, _ZNSt3__14coutE@GOTPAGEOFF]
+ 1      1     0.25                        adrp	x1, l_.str@PAGE
+ 1      1     0.25                        add	x1, x1, l_.str@PAGEOFF
+ 1      0     0.50                        bl	_ZNSt3__1lsB8ne200100INS_11char_traitsIcEEEERNS_13basic_ostreamIcT_EES6_PKc
+ 1      1     0.25                        mov	w0, #10
+ 1      1     0.25                        mov	w1, #20
+ 1      0     0.50                        bl	_Z3addii
+ 2      4     0.50    *                   ldp	x29, x30, [sp, #16]
+ 1      1     0.25                        add	sp, sp, #32
+ 1      0     1.00                  U     ret
+
+
+Resources:
+[0.0] - CyUnitB
+[0.1] - CyUnitB
+[1]   - CyUnitBR
+[2.0] - CyUnitFloatDiv
+[2.1] - CyUnitFloatDiv
+[3.0] - CyUnitI
+[3.1] - CyUnitI
+[3.2] - CyUnitI
+[3.3] - CyUnitI
+[4]   - CyUnitID
+[5]   - CyUnitIM
+[6.0] - CyUnitIS
+[6.1] - CyUnitIS
+[7]   - CyUnitIntDiv
+[8.0] - CyUnitLS
+[8.1] - CyUnitLS
+[9.0] - CyUnitV
+[9.1] - CyUnitV
+[9.2] - CyUnitV
+[10]  - CyUnitVC
+[11]  - CyUnitVD
+[12.0] - CyUnitVM
+[12.1] - CyUnitVM
+
+
+Resource pressure per iteration:
+[0.0]  [0.1]  [1]    [2.0]  [2.1]  [3.0]  [3.1]  [3.2]  [3.3]  [4]    [5]    [6.0]  [6.1]  [7]    [8.0]  [8.1]  [9.0]  [9.1]  [9.2]  [10]   [11]   [12.0] [12.1] 
+13.46  13.54  8.00    -      -     11.60  12.44  11.60  12.36  8.00   5.00   2.00   2.00   40.00  13.50  13.50  0.66   0.67   0.67    -      -      -      -     
+
+Resource pressure by instruction:
+[0.0]  [0.1]  [1]    [2.0]  [2.1]  [3.0]  [3.1]  [3.2]  [3.3]  [4]    [5]    [6.0]  [6.1]  [7]    [8.0]  [8.1]  [9.0]  [9.1]  [9.2]  [10]   [11]   [12.0] [12.1] Instructions:
+ -      -      -      -      -     0.06   0.43   0.05   0.46    -      -      -      -      -      -      -      -      -      -      -      -      -      -     sub	sp, sp, #16
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.53   0.47    -      -      -      -      -      -      -     str	w0, [sp, #12]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.46   0.54    -      -      -      -      -      -      -     str	w1, [sp, #8]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     ldr	w8, [sp, #12]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.51   0.49    -      -      -      -      -      -      -     ldr	w10, [sp, #8]
+0.94   1.06    -      -      -     0.10   0.98   0.04   0.88   2.00    -      -      -     10.00   -      -      -      -      -      -      -      -      -     sdiv	w9, w8, w10
+0.52   0.48   1.00    -      -     0.06   0.44   0.05   0.45    -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     mul	w9, w9, w10
+ -      -      -      -      -     0.06   0.88   0.16   0.90    -      -      -     2.00    -      -      -      -      -      -      -      -      -      -     subs	w0, w8, w9
+ -      -      -      -      -     0.45   0.05   0.46   0.04    -      -      -      -      -      -      -      -      -      -      -      -      -      -     add	sp, sp, #16
+0.53   0.47   1.00    -      -     0.05   0.45   0.05   0.45    -      -      -      -      -      -      -      -      -      -      -      -      -      -     ret
+ -      -      -      -      -     0.47   0.04   0.47   0.02    -      -      -      -      -      -      -      -      -      -      -      -      -      -     sub	sp, sp, #32
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.53   0.47   0.33   0.33   0.34    -      -      -      -     stp	x29, x30, [sp, #16]
+ -      -      -      -      -     0.04   0.47   0.03   0.46    -      -      -      -      -      -      -      -      -      -      -      -      -      -     add	x29, sp, #16
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.53   0.47    -      -      -      -      -      -      -     str	w0, [sp, #8]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.47   0.53    -      -      -      -      -      -      -     str	w1, [sp, #4]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.49   0.51    -      -      -      -      -      -      -     ldr	w8, [sp, #4]
+0.53   0.47    -      -      -     0.44   0.06   0.47   0.03    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cbnz	w8, LBB1_2
+0.49   0.51    -      -      -     0.48   0.04   0.44   0.04    -      -      -      -      -      -      -      -      -      -      -      -      -      -     b	LBB1_1
+ -      -      -      -      -     0.03   0.46   0.03   0.48    -      -      -      -      -      -      -      -      -      -      -      -      -      -     mov	w8, #1
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.53   0.47    -      -      -      -      -      -      -     stur	w8, [x29, #-4]
+0.51   0.49    -      -      -     0.47   0.03   0.47   0.03    -      -      -      -      -      -      -      -      -      -      -      -      -      -     b	LBB1_5
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.51   0.49    -      -      -      -      -      -      -     ldr	w8, [sp, #4]
+ -      -      -      -      -     0.06   0.44   0.04   0.46    -      -      -      -      -      -      -      -      -      -      -      -      -      -     mov	w10, #2
+0.96   1.04    -      -      -     0.88   0.10   0.90   0.12   2.00    -      -      -     10.00   -      -      -      -      -      -      -      -      -     sdiv	w9, w8, w10
+0.52   0.48   1.00    -      -     0.03   0.48   0.06   0.43    -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     mul	w9, w9, w10
+ -      -      -      -      -     0.12   0.88   0.10   0.90    -      -     2.00    -      -      -      -      -      -      -      -      -      -      -     subs	w8, w8, w9
+0.52   0.48    -      -      -     0.04   0.45   0.07   0.44    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cbnz	w8, LBB1_4
+0.47   0.53    -      -      -     0.44   0.05   0.46   0.05    -      -      -      -      -      -      -      -      -      -      -      -      -      -     b	LBB1_3
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.49   0.51    -      -      -      -      -      -      -     ldr	w8, [sp, #8]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.51   0.49    -      -      -      -      -      -      -     ldr	w9, [sp, #8]
+0.50   0.50   1.00    -      -     0.42   0.06   0.48   0.04    -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     mul	w0, w8, w9
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.49   0.51    -      -      -      -      -      -      -     ldr	w8, [sp, #4]
+ -      -      -      -      -     0.04   0.48   0.02   0.46    -      -      -      -      -      -      -      -      -      -      -      -      -      -     mov	w9, #2
+0.96   1.04    -      -      -     0.96   0.12   0.86   0.06   2.00    -      -      -     10.00   -      -      -      -      -      -      -      -      -     sdiv	w1, w8, w9
+0.51   0.49    -      -      -     0.44   0.03   0.46   0.07    -      -      -      -      -      -      -      -      -      -      -      -      -      -     bl	_Z6binexpii
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.47   0.53    -      -      -      -      -      -      -     stur	w0, [x29, #-4]
+0.50   0.50    -      -      -     0.03   0.47   0.06   0.44    -      -      -      -      -      -      -      -      -      -      -      -      -      -     b	LBB1_5
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     ldr	w8, [sp, #8]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.53   0.47    -      -      -      -      -      -      -     str	w8, [sp]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.49   0.51    -      -      -      -      -      -      -     ldr	w8, [sp, #8]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.51   0.49    -      -      -      -      -      -      -     ldr	w9, [sp, #8]
+0.51   0.49   1.00    -      -     0.05   0.45   0.04   0.46    -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     mul	w0, w8, w9
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.49   0.51    -      -      -      -      -      -      -     ldr	w8, [sp, #4]
+ -      -      -      -      -     0.08   0.45   0.03   0.44    -      -      -      -      -      -      -      -      -      -      -      -      -      -     mov	w9, #2
+1.08   0.92    -      -      -     0.10   0.90   0.14   0.86   2.00    -      -      -     10.00   -      -      -      -      -      -      -      -      -     sdiv	w1, w8, w9
+0.48   0.52    -      -      -     0.44   0.02   0.45   0.09    -      -      -      -      -      -      -      -      -      -      -      -      -      -     bl	_Z6binexpii
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.49   0.51    -      -      -      -      -      -      -     ldr	w8, [sp]
+0.51   0.49   1.00    -      -     0.45   0.06   0.44   0.05    -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     mul	w8, w8, w0
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.47   0.53    -      -      -      -      -      -      -     stur	w8, [x29, #-4]
+0.48   0.52    -      -      -     0.45   0.07   0.44   0.04    -      -      -      -      -      -      -      -      -      -      -      -      -      -     b	LBB1_5
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     ldur	w0, [x29, #-4]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     ldp	x29, x30, [sp, #16]
+ -      -      -      -      -     0.08   0.42   0.03   0.47    -      -      -      -      -      -      -      -      -      -      -      -      -      -     add	sp, sp, #32
+0.49   0.51   1.00    -      -     0.45   0.05   0.43   0.07    -      -      -      -      -      -      -      -      -      -      -      -      -      -     ret
+ -      -      -      -      -     0.44   0.05   0.45   0.06    -      -      -      -      -      -      -      -      -      -      -      -      -      -     sub	sp, sp, #32
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.53   0.47   0.33   0.34   0.33    -      -      -      -     stp	x29, x30, [sp, #16]
+ -      -      -      -      -     0.09   0.44   0.02   0.45    -      -      -      -      -      -      -      -      -      -      -      -      -      -     add	x29, sp, #16
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.47   0.53    -      -      -      -      -      -      -     stur	wzr, [x29, #-4]
+ -      -      -      -      -     0.45   0.03   0.45   0.07    -      -      -      -      -      -      -      -      -      -      -      -      -      -     adrp	x0, _ZNSt3__14coutE@GOTPAGE
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     ldr	x0, [x0, _ZNSt3__14coutE@GOTPAGEOFF]
+ -      -      -      -      -     0.02   0.44   0.07   0.47    -      -      -      -      -      -      -      -      -      -      -      -      -      -     adrp	x1, l_.str@PAGE
+ -      -      -      -      -     0.06   0.46   0.03   0.45    -      -      -      -      -      -      -      -      -      -      -      -      -      -     add	x1, x1, l_.str@PAGEOFF
+0.49   0.51    -      -      -     0.45   0.07   0.46   0.02    -      -      -      -      -      -      -      -      -      -      -      -      -      -     bl	_ZNSt3__1lsB8ne200100INS_11char_traitsIcEEEERNS_13basic_ostreamIcT_EES6_PKc
+ -      -      -      -      -     0.46   0.03   0.44   0.07    -      -      -      -      -      -      -      -      -      -      -      -      -      -     mov	w0, #10
+ -      -      -      -      -     0.02   0.45   0.09   0.44    -      -      -      -      -      -      -      -      -      -      -      -      -      -     mov	w1, #20
+0.48   0.52    -      -      -     0.44   0.09   0.44   0.03    -      -      -      -      -      -      -      -      -      -      -      -      -      -     bl	_Z3addii
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     ldp	x29, x30, [sp, #16]
+ -      -      -      -      -     0.47   0.05   0.45   0.03    -      -      -      -      -      -      -      -      -      -      -      -      -      -     add	sp, sp, #32
+0.48   0.52   1.00    -      -     0.43   0.02   0.47   0.08    -      -      -      -      -      -      -      -      -      -      -      -      -      -     ret
+HOWDY
+=== Instruction Performance Stats ===
+idx=0 latency=1 uops=1.0 throughput=0.25
+idx=1 latency=4 uops=1.0 throughput=0.5
+idx=2 latency=4 uops=1.0 throughput=0.5
+idx=3 latency=4 uops=1.0 throughput=0.5
+idx=4 latency=4 uops=1.0 throughput=0.5
+idx=5 latency=10 uops=1.0 throughput=10.0
+idx=6 latency=4 uops=1.0 throughput=1.0
+idx=7 latency=2 uops=1.0 throughput=1.0
+idx=8 latency=1 uops=1.0 throughput=0.25
+idx=9 latency=0 uops=1.0 throughput=1.0
+idx=10 latency=1 uops=1.0 throughput=0.25
+idx=11 latency=6 uops=2.0 throughput=0.5
+idx=12 latency=1 uops=1.0 throughput=0.25
+idx=13 latency=4 uops=1.0 throughput=0.5
+idx=14 latency=4 uops=1.0 throughput=0.5
+idx=15 latency=4 uops=1.0 throughput=0.5
+idx=16 latency=0 uops=1.0 throughput=0.5
+idx=17 latency=0 uops=1.0 throughput=0.5
+idx=18 latency=1 uops=1.0 throughput=0.25
+idx=19 latency=4 uops=1.0 throughput=0.5
+idx=20 latency=0 uops=1.0 throughput=0.5
+idx=21 latency=4 uops=1.0 throughput=0.5
+idx=22 latency=1 uops=1.0 throughput=0.25
+idx=23 latency=10 uops=1.0 throughput=10.0
+idx=24 latency=4 uops=1.0 throughput=1.0
+idx=25 latency=2 uops=1.0 throughput=1.0
+idx=26 latency=0 uops=1.0 throughput=0.5
+idx=27 latency=0 uops=1.0 throughput=0.5
+idx=28 latency=4 uops=1.0 throughput=0.5
+idx=29 latency=4 uops=1.0 throughput=0.5
+idx=30 latency=4 uops=1.0 throughput=1.0
+idx=31 latency=4 uops=1.0 throughput=0.5
+idx=32 latency=1 uops=1.0 throughput=0.25
+idx=33 latency=10 uops=1.0 throughput=10.0
+idx=34 latency=0 uops=1.0 throughput=0.5
+idx=35 latency=4 uops=1.0 throughput=0.5
+idx=36 latency=0 uops=1.0 throughput=0.5
+idx=37 latency=4 uops=1.0 throughput=0.5
+idx=38 latency=4 uops=1.0 throughput=0.5
+idx=39 latency=4 uops=1.0 throughput=0.5
+idx=40 latency=4 uops=1.0 throughput=0.5
+idx=41 latency=4 uops=1.0 throughput=1.0
+idx=42 latency=4 uops=1.0 throughput=0.5
+idx=43 latency=1 uops=1.0 throughput=0.25
+idx=44 latency=10 uops=1.0 throughput=10.0
+idx=45 latency=0 uops=1.0 throughput=0.5
+idx=46 latency=4 uops=1.0 throughput=0.5
+idx=47 latency=4 uops=1.0 throughput=1.0
+idx=48 latency=4 uops=1.0 throughput=0.5
+idx=49 latency=0 uops=1.0 throughput=0.5
+idx=50 latency=4 uops=1.0 throughput=0.5
+idx=51 latency=4 uops=2.0 throughput=0.5
+idx=52 latency=1 uops=1.0 throughput=0.25
+idx=53 latency=0 uops=1.0 throughput=1.0
+idx=54 latency=1 uops=1.0 throughput=0.25
+idx=55 latency=6 uops=2.0 throughput=0.5
+idx=56 latency=1 uops=1.0 throughput=0.25
+idx=57 latency=4 uops=1.0 throughput=0.5
+idx=58 latency=1 uops=1.0 throughput=0.25
+idx=59 latency=4 uops=1.0 throughput=0.5
+idx=60 latency=1 uops=1.0 throughput=0.25
+idx=61 latency=1 uops=1.0 throughput=0.25
+idx=62 latency=0 uops=1.0 throughput=0.5
+idx=63 latency=1 uops=1.0 throughput=0.25
+idx=64 latency=1 uops=1.0 throughput=0.25
+idx=65 latency=0 uops=1.0 throughput=0.5
+idx=66 latency=4 uops=2.0 throughput=0.5
+idx=67 latency=1 uops=1.0 throughput=0.25
+idx=68 latency=0 uops=1.0 throughput=1.0
+
