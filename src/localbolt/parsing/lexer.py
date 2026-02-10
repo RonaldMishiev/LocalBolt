@@ -7,7 +7,8 @@ from typing import List, Dict, Tuple, Set, Optional
 # 1. NOISE LABELS
 # macOS: Lfunc_begin0, l_.str
 # Linux: .LBB0_1, .Ltmp0, .LFB0, .LFE0
-RE_NOISE_LABEL = re.compile(r"^\s*(\.?)_*[Ll](\d+|BB|func|tmp|return|set|addr|exception|ttbase|cst|ttbaseref|debug|names|info|line|cu|common|str_off|abbrev|FB|FE)[a-zA-Z0-9_$]*:")
+# RE_NOISE_LABEL = re.compile(r"^\s*(\.?)_*[Ll](\d+|BB|func|tmp|return|set|addr|exception|ttbase|cst|ttbaseref|debug|names|info|line|cu|common|str_off|abbrev|FB|FE)[a-zA-Z0-9_$]*:")
+RE_NOISE_LABEL = re.compile(r"^\s*(\.?)_*[Ll](\d+|func|tmp|return|set|addr|exception|ttbase|cst|ttbaseref|debug|names|info|line|cu|common|str_off|abbrev|FB|FE)[a-zA-Z0-9_$]*:")
 
 # 2. SYSTEM SYMBOLS
 # Handles std::, GCC/Clang internals, and ABI hooks

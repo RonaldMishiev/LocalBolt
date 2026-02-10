@@ -44,3 +44,7 @@ class LocalBoltState:
     def update_perf(self, stats: Dict[int, InstructionStats], raw: str):
         self.perf_stats = stats
         self.raw_mca_output = raw
+
+    def get_line_number(self, app) -> int:
+        """Query the AsmApp for the current cursor line number (1-based)."""
+        return app.get_line_number()
