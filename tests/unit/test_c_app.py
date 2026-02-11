@@ -177,7 +177,7 @@ def _inject_fakes(engine_instance=None):
 
     # --- localbolt.utils.asm_help ---
     asm_help_mod = types.ModuleType("localbolt.utils.asm_help")
-    asm_help_mod.ASM_INSTRUCTIONS = {}
+    asm_help_mod.get_asm_instructions = lambda: {}
 
     # --- localbolt.ui.instruction_help ---
     # We let instruction_help import naturally since it only needs asm_help
