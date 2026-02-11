@@ -3,6 +3,8 @@ import shutil
 from pathlib import Path
 from rich.text import Text
 
+from .isa_keywords import get_isa, get_keywords, NUMBERS
+
 # Palette provided by user
 C_FOREGROUND = "#EBEEEE"
 C_TEXT = "#191A1A"
@@ -13,29 +15,12 @@ C_MISC4 = "#af5f00" # Strong Orange (Registers)
 
 _ERR_FILE = Path(__file__).resolve().parents[3] / "highlight_errors.txt"
 
-REGISTERS = re.compile(
-    r"\b("
-    r"r[abcd]x|r[sd]i|r[bs]p|r(?:8|9|1[0-5])[dwb]?"
-    r"|e[abcd]x|e[sd]i|e[bs]p"
-    r"|[abcd][hl]|[abcd]x|[sd]il?|[bs]pl?"
-    r"|xmm[0-9]+|ymm[0-9]+|zmm[0-9]+"
-    r"|[wx][0-9]{1,2}|sp|fp|lr"
-    r")\b",
-    re.IGNORECASE,
-)
-
-SIZE_KEYWORDS = re.compile(r"\b(DWORD|QWORD|WORD|BYTE|PTR)\b")
-NUMBERS = re.compile(r"\b(0x[0-9a-fA-F]+|0b[01]+|[0-9]+)\b")
-INSTRUCTIONS = re.compile(
-    r"\b("
-    r"movs?[xzbw]?|lea|add|subs?|imul|idiv|mul|div|sdiv|inc|dec"
-    r"|cmp|test|and|or|xor|not|shl|shr|sar|sal"
-    r"|jmp|je|jne|jz|jnz|jg|jge|jl|jle|ja|jae|jb|jbe"
-    r"|call|ret|push|pop|nop|int|syscall|leave|enter"
-    r"|cmov\w+|adrp|bl|b\.|cbnz"
-    r")\b",
-    re.IGNORECASE,
-)
+# ISA-specific keyword regexes (resolved once at import from isa_keywords)
+_ISA = get_isa()
+_KEYWORDS = get_keywords(_ISA)
+REGISTERS = _KEYWORDS["REGISTERS"]
+SIZE_KEYWORDS = _KEYWORDS["SIZE_KEYWORDS"]
+INSTRUCTIONS = _KEYWORDS["INSTRUCTIONS"]
 
 def _severity_styles(cycles: int | None) -> tuple[str, str]:
     """Light-mode compatible heatmap palette."""

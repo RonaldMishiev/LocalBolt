@@ -40,6 +40,8 @@ class AsmScroll(VerticalScroll): BINDINGS = []
 class LocalBoltApp(App):
     """Modern Assembly Explorer with Dual Floating Popups."""
 
+    TITLE = "⚡ LocalBolt — Assembly Explorer"
+
     CSS = f"""
     Screen {{ 
         background: {C_BG}; 
@@ -49,7 +51,11 @@ class LocalBoltApp(App):
     }}
     
     Header {{
-        color: {C_TEXT};
+        background: {C_TEXT};
+        color: {C_ACCENT1};
+        text-style: bold italic;
+        height: 1;
+        padding: 0 2;
     }}
 
     #main-layout {{
@@ -78,8 +84,19 @@ class LocalBoltApp(App):
     
     #error-view {{ color: #a80000; display: none; margin: 1 2; }}
     
-    SourcePeekPanel {{ layer: popups; }}
-    InstructionHelpPanel {{ layer: popups; }}
+    #explainer-panels {{
+        height: 8;
+        width: 100%;
+        margin: 0 1 1 1;
+    }}
+    #instr-help {{
+        height: 3;
+        width: 100%;
+    }}
+    #source-peek {{
+        height: 5;
+        width: 100%;
+    }}
     FlagsPopup {{ 
         display: none;
         layer: popups;
@@ -131,9 +148,11 @@ class LocalBoltApp(App):
                 header_text = Text("⚡ Performance (⏰ Cycles)", style="bold italic")
                 yield Static(header_text, id="asm-column-header")
                 yield AsmScroll(id="asm-container")
-        # Dual Floating Popups
-        yield SourcePeekPanel(id="source-peek")
-        yield InstructionHelpPanel(id="instr-help")
+            # Fixed bottom explainer area (does not overlay asm content)
+            with Vertical(id="explainer-panels"):
+                yield InstructionHelpPanel(id="instr-help")
+                yield SourcePeekPanel(id="source-peek")
+        # Floating popup only for compiler flags
         yield FlagsPopup(id="flags-palette")
         yield Footer()
 
