@@ -6,7 +6,7 @@
 </p>
 
 <h1 align="center">
-  ⚡ LocalBolt
+  LocalBolt ⚡
 </h1>
 
 <p align="center">
