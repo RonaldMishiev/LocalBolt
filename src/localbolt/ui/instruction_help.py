@@ -2,7 +2,7 @@ from __future__ import annotations
 import re
 from rich.text import Text
 from textual.widgets import Static
-from ..utils.asm_help import ASM_INSTRUCTIONS
+from ..utils.asm_help import get_asm_instructions
 from ..utils.highlighter import INSTRUCTIONS
 
 # User Palette
@@ -20,15 +20,8 @@ class InstructionHelpPanel(Static):
 
     DEFAULT_CSS = f"""
     InstructionHelpPanel {{
-        layer: overlay;
-        dock: bottom;
-        margin-left: 4;
-        margin-right: 4;
-        margin-bottom: 10; /* Positioned above the Source Peek */
-        
         height: 3;
         width: 100%;
-        
         background: {C_BG};
         color: {C_TEXT};
         border: solid {C_ACCENT1};
@@ -58,8 +51,9 @@ class InstructionHelpPanel(Static):
                 self.display = False
                 return
 
+        instructions = get_asm_instructions()
         help_data = None
-        for key, data in ASM_INSTRUCTIONS.items():
+        for key, data in instructions.items():
             if mnemonic in key.split('/'):
                 help_data = (key, data)
                 break

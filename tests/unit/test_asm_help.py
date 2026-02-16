@@ -4,22 +4,32 @@ import os
 # Add src to python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'src')))
 
-from localbolt.utils.asm_help import ASM_INSTRUCTIONS, create_gradient_header
+from localbolt.utils.asm_instructions import get_asm_instructions, ASM_INSTRUCTIONS_X86, ASM_INSTRUCTIONS_ARM
+from localbolt.utils.asm_help import create_gradient_header
 from rich.text import Text
 
 def test_asm_instructions_content():
-    """Verify that the instruction dictionary is populated and has correct structure."""
-    assert len(ASM_INSTRUCTIONS) >= 20
-    assert "MOV" in ASM_INSTRUCTIONS
-    assert "PUSH" in ASM_INSTRUCTIONS
-    
+    """Verify that ISA-specific instruction dicts are populated and have correct structure."""
+    x86 = get_asm_instructions("x86")
+    arm = get_asm_instructions("arm")
+    assert len(x86) >= 20
+    assert len(arm) >= 20
+    assert "MOV" in x86
+    assert "PUSH" in x86
+    assert "LEA" in x86
+    assert "MOV" in arm
+    assert "BL" in arm
+    assert "LDR" in arm
+    assert "PUSH" not in arm
+
     # Check structure: (Description, Example, Meaning)
-    data = ASM_INSTRUCTIONS["MOV"]
-    assert len(data) == 3
-    assert isinstance(data[0], str)
-    assert isinstance(data[1], str)
-    assert isinstance(data[2], str)
-    assert "mov" in data[1].lower()
+    for isa_name, d in [("x86", x86), ("arm", arm)]:
+        data = d["MOV"]
+        assert len(data) == 3, isa_name
+        assert isinstance(data[0], str)
+        assert isinstance(data[1], str)
+        assert isinstance(data[2], str)
+        assert "mov" in data[1].lower()
 
 def test_gradient_header_generation():
     """Verify that the gradient header is generated as a Rich Text object."""
@@ -34,9 +44,9 @@ def test_gradient_header_generation():
 
 def test_instruction_sorting():
     """Ensure we can sort the instructions for display."""
-    keys = list(ASM_INSTRUCTIONS.keys())
+    x86 = get_asm_instructions("x86")
+    keys = list(x86.keys())
     sorted_keys = sorted(keys)
-    # Just check that it's sorted and has the same number of elements
     assert len(sorted_keys) == len(keys)
     assert sorted_keys == sorted(keys)
     assert "ADD" in sorted_keys
