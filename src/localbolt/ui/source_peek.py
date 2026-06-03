@@ -24,22 +24,14 @@ class SourcePeekPanel(Static):
 
     DEFAULT_CSS = f"""
     SourcePeekPanel {{
-        layer: overlay;
-        /* Positioning: Bottom Right corner by default */
-        dock: bottom;
-        margin-left: 4;
-        margin-right: 4;
-        margin-bottom: 3;
-        
         width: 100%;
         height: auto;
-        
         background: {C_BG};
         color: {C_TEXT};
         border: solid {C_ACCENT3};
         padding: 0 1;
         display: none;
-        opacity: 95%; 
+        opacity: 95%;
     }}
     """
 
